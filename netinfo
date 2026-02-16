@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Network Info Script for Waybar
+# Place at: ~/.local/bin/netinfo
+# Make executable: chmod +x ~/.local/bin/netinfo
+#
+# Usage:
+#   netinfo        # Run rootless network diagnostics
+#   netinfo root   # Run with sudo for full info (netstat -tulpen)
+
+set -e
+
+# Colors for cyberpunk theme
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+PINK='\033[1;35m'
+NC='\033[0m' # No Color
+
+header() {
+    echo -e "\n${PINK}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  $1${NC}"
+    echo -e "${PINK}═══════════════════════════════════════════════════════════════${NC}\n"
+}
+
+if [[ "${1:-}" == "root" ]]; then
+    # Root mode - full netstat
+    header "NETWORK CONNECTIONS (sudo netstat -tulpen)"
+    sudo netstat -tulpen 2>/dev/null || sudo ss -tulpen
+
+    header "TOP 10 CONNECTIONS BY TRAFFIC (nethogs snapshot)"
+    timeout 5 sudo nethogs -t -c 2 2>/dev/null | head -20 || echo "nethogs not available or requires longer capture"
+
+    header "ROUTING TABLE"
+    ip route
+
+    header "ARP TABLE"
+    ip neigh
+else
+    # Rootless mode
+    header "NETWORK INTERFACES"
+    ip -c addr show
+
+    header "ACTIVE CONNECTIONS (ss -tun)"
+    ss -tun | head -20
+
+    header "LISTENING PORTS (ss -tuln)"
+    ss -tuln
+
+    header "DNS SERVERS"
+    cat /etc/resolv.conf 2>/dev/null | grep -E '^nameserver' || resolvectl status 2>/dev/null | grep -E 'DNS Servers' || echo "Unable to determine DNS"
+
+    header "DEFAULT GATEWAY"
+    ip route | grep default
+
+    header "BANDWIDTH BY PROCESS (bandwhich - 5 sec)"
+    echo "Press Ctrl+C to exit early..."
+    timeout 5 bandwhich 2>/dev/null || echo "bandwhich not available, install with: nix-shell -p bandwhich"
+fi
+
+echo -e "\n${MAGENTA}Press Enter to close...${NC}"
+read -r

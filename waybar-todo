@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# waybar-todo - Simple todo list widget for waybar
+# Usage: waybar-todo [count|menu|add|edit|done]
+
+set -euo pipefail
+
+TODO_FILE="${HOME}/.local/share/waybar-todo.txt"
+DONE_FILE="${HOME}/.local/share/waybar-done.txt"
+
+# Ensure files exist
+mkdir -p "$(dirname "$TODO_FILE")"
+touch "$TODO_FILE" "$DONE_FILE"
+
+count_todos() {
+    local count
+    count=$(grep -c . "$TODO_FILE" 2>/dev/null || echo 0)
+    local tooltip
+    if [[ "$count" -eq 0 ]]; then
+        tooltip="No tasks - Right-click to add"
+    else
+        tooltip=$(head -5 "$TODO_FILE" | sed 's/^/• /' | tr '\n' '\r' | sed 's/\r$//')
+        if [[ "$count" -gt 5 ]]; then
+            tooltip="${tooltip}\r... and $((count - 5)) more"
+        fi
+        # Escape for JSON
+        tooltip=$(echo "$tooltip" | sed 's/"/\\"/g' | tr '\r' '\n')
+    fi
+    printf '{"text": "%s", "tooltip": "%s", "class": "%s"}\n' \
+        "$count" "$tooltip" "$([ "$count" -gt 0 ] && echo 'has-tasks' || echo 'empty')"
+}
+
+show_menu() {
+    local count
+    count=$(grep -c . "$TODO_FILE" 2>/dev/null || echo 0)
+
+    if [[ "$count" -eq 0 ]]; then
+        local choice
+        choice=$(echo -e "Add new task\nView completed" | rofi -dmenu -p "TODO (empty)" -theme-str 'window {width: 400px;}')
+        case "$choice" in
+            "Add new task") add_todo ;;
+            "View completed") view_done ;;
+        esac
+        return
+    fi
+
+    # Build menu with numbered tasks
+    local menu=""
+    local i=1
+    while IFS= read -r line; do
+        menu+="[$i] $line\n"
+        ((i++))
+    done < "$TODO_FILE"
+    menu+="---\n+ Add new task\n✓ Mark done\n✗ Delete task\n📋 View completed"
+
+    local choice
+    choice=$(echo -e "$menu" | rofi -dmenu -p "TODO ($count)" -theme-str 'window {width: 500px;}' -i)
+
+    case "$choice" in
+        "+ Add new task") add_todo ;;
+        "✓ Mark done") mark_done ;;
+        "✗ Delete task") delete_task ;;
+        "📋 View completed") view_done ;;
+        \[*)
+            # Selected a task - show options
+            local task_num
+            task_num=$(echo "$choice" | sed 's/\[\([0-9]*\)\].*/\1/')
+            task_action "$task_num"
+            ;;
+    esac
+}
+
+add_todo() {
+    local task
+    task=$(rofi -dmenu -p "New task" -theme-str 'window {width: 500px;}' -l 0)
+    if [[ -n "$task" ]]; then
+        echo "$task" >> "$TODO_FILE"
+        notify-send "TODO" "Added: $task" -t 2000
+    fi
+}
+
+mark_done() {
+    local count
+    count=$(grep -c . "$TODO_FILE" 2>/dev/null || echo 0)
+    [[ "$count" -eq 0 ]] && return
+
+    local menu=""
+    local i=1
+    while IFS= read -r line; do
+        menu+="[$i] $line\n"
+        ((i++))
+    done < "$TODO_FILE"
+
+    local choice
+    choice=$(echo -e "$menu" | rofi -dmenu -p "Mark done" -theme-str 'window {width: 500px;}' -i)
+
+    if [[ "$choice" =~ ^\[[0-9]+\] ]]; then
+        local task_num
+        task_num=$(echo "$choice" | sed 's/\[\([0-9]*\)\].*/\1/')
+        local task
+        task=$(sed -n "${task_num}p" "$TODO_FILE")
+
+        # Add to done file with timestamp
+        echo "[$(date '+%Y-%m-%d %H:%M')] $task" >> "$DONE_FILE"
+        # Remove from todo
+        sed -i "${task_num}d" "$TODO_FILE"
+        notify-send "TODO" "Completed: $task" -t 2000
+    fi
+}
+
+delete_task() {
+    local count
+    count=$(grep -c . "$TODO_FILE" 2>/dev/null || echo 0)
+    [[ "$count" -eq 0 ]] && return
+
+    local menu=""
+    local i=1
+    while IFS= read -r line; do
+        menu+="[$i] $line\n"
+        ((i++))
+    done < "$TODO_FILE"
+
+    local choice
+    choice=$(echo -e "$menu" | rofi -dmenu -p "Delete task" -theme-str 'window {width: 500px;}' -i)
+
+    if [[ "$choice" =~ ^\[[0-9]+\] ]]; then
+        local task_num
+        task_num=$(echo "$choice" | sed 's/\[\([0-9]*\)\].*/\1/')
+        local task
+        task=$(sed -n "${task_num}p" "$TODO_FILE")
+
+        sed -i "${task_num}d" "$TODO_FILE"
+        notify-send "TODO" "Deleted: $task" -t 2000
+    fi
+}
+
+task_action() {
+    local num="$1"
+    local task
+    task=$(sed -n "${num}p" "$TODO_FILE")
+
+    local choice
+    choice=$(echo -e "✓ Mark done\n✗ Delete\n📝 Edit" | rofi -dmenu -p "$task" -theme-str 'window {width: 400px;}')
+
+    case "$choice" in
+        "✓ Mark done")
+            echo "[$(date '+%Y-%m-%d %H:%M')] $task" >> "$DONE_FILE"
+            sed -i "${num}d" "$TODO_FILE"
+            notify-send "TODO" "Completed: $task" -t 2000
+            ;;
+        "✗ Delete")
+            sed -i "${num}d" "$TODO_FILE"
+            notify-send "TODO" "Deleted: $task" -t 2000
+            ;;
+        "📝 Edit")
+            local new_task
+            new_task=$(echo "$task" | rofi -dmenu -p "Edit task" -theme-str 'window {width: 500px;}')
+            if [[ -n "$new_task" ]]; then
+                sed -i "${num}s/.*/$new_task/" "$TODO_FILE"
+                notify-send "TODO" "Updated task" -t 2000
+            fi
+            ;;
+    esac
+}
+
+view_done() {
+    local count
+    count=$(grep -c . "$DONE_FILE" 2>/dev/null || echo 0)
+
+    if [[ "$count" -eq 0 ]]; then
+        notify-send "TODO" "No completed tasks" -t 2000
+        return
+    fi
+
+    # Show last 20 completed tasks
+    local menu
+    menu=$(tail -20 "$DONE_FILE" | tac)
+
+    local choice
+    choice=$(echo -e "$menu\n---\n🗑️ Clear history" | rofi -dmenu -p "Completed ($count)" -theme-str 'window {width: 600px;}' -i)
+
+    if [[ "$choice" == "🗑️ Clear history" ]]; then
+        > "$DONE_FILE"
+        notify-send "TODO" "Cleared completed tasks history" -t 2000
+    fi
+}
+
+edit_file() {
+    foot -e "${EDITOR:-nvim}" "$TODO_FILE"
+}
+
+case "${1:-count}" in
+    count) count_todos ;;
+    menu) show_menu ;;
+    add) add_todo ;;
+    done) mark_done ;;
+    edit) edit_file ;;
+    *) echo "Usage: $0 [count|menu|add|done|edit]" >&2; exit 1 ;;
+esac

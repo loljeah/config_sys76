@@ -1,0 +1,19 @@
+# lan-mouse configuration - CLIENT MODE (being controlled)
+# This machine is controlled by 192.168.10.200
+
+[settings]
+# Port to listen on for incoming connections
+port = 24800
+
+# Release bind keys (press to release mouse/keyboard back to server)
+release_bind = ["KeyLeftAlt", "KeyLeftCtrl", "KeyG"]
+
+# Frontend: "cli" for headless/daemon mode, "gtk" for GUI
+frontend = "cli"
+
+# The controlling server
+[[peers]]
+hostname = "192.168.10.200"
+# Position of THIS screen relative to the server
+# Options: left, right, top, bottom
+position = "left"

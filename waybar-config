@@ -1,0 +1,176 @@
+{
+    "layer": "top",
+    "position": "bottom",
+    "height": 31,
+    "spacing": 2,
+    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "wlr/taskbar"],
+    "modules-center": ["sway/window"],
+    "modules-right": ["mpris", "tray", "idle_inhibitor", "pulseaudio", "network", "cpu", "memory", "disk", "temperature", "battery", "custom/todo", "clock"],
+
+    "sway/workspaces": {
+        "disable-scroll": false,
+        "all-outputs": false,
+        "format": "{name}",
+        "format-icons": {
+            "urgent": "",
+            "focused": "",
+            "default": ""
+        }
+    },
+
+    "sway/mode": {
+        "format": "<span style=\"italic\">{}</span>"
+    },
+
+    "sway/scratchpad": {
+        "format": "{icon} {count}",
+        "show-empty": false,
+        "format-icons": ["", ""],
+        "tooltip": true,
+        "tooltip-format": "{app}: {title}"
+    },
+
+    "sway/window": {
+        "max-length": 40
+    },
+
+    "wlr/taskbar": {
+        "format": "{icon} {name}",
+        "icon-size": 20,
+        "icon-theme": "Adwaita",
+        "tooltip-format": "{app_id}: {title}",
+        "on-click": "activate",
+        "on-click-middle": "close",
+        "on-click-right": "minimize",
+        "ignore-list": [],
+        "app_ids-mapping": {},
+        "rewrite": {},
+        "all-outputs": false,
+        "markup": true
+    },
+
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": "AWAKE",
+            "deactivated": "IDLE"
+        },
+        "tooltip-format-activated": "Idle inhibitor: ON",
+        "tooltip-format-deactivated": "Idle inhibitor: OFF"
+    },
+
+    "tray": {
+        "icon-size": 20,
+        "spacing": 4
+    },
+
+    "clock": {
+        "timezone": "Europe/Vienna",
+        "format": "{:%H:%M}",
+        "format-alt": "{:%Y-%m-%d %H:%M:%S}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+        "interval": 1
+    },
+
+    "cpu": {
+        "format": "CPU {usage}%",
+        "tooltip": true,
+        "interval": 2,
+        "on-click": "foot -e htop"
+    },
+
+    "memory": {
+        "format": "MEM {}%",
+        "tooltip-format": "{used:0.1f}G / {total:0.1f}G used",
+        "interval": 5,
+        "on-click": "foot -e htop"
+    },
+
+    "disk": {
+        "format": "DISK {percentage_used}%",
+        "tooltip-format": "{path}: {used} / {total} ({percentage_used}%)",
+        "path": "/",
+        "interval": 30,
+        "on-click": "thunar"
+    },
+
+    "temperature": {
+        "critical-threshold": 80,
+        "format": "{temperatureC}°C",
+        "format-critical": "{temperatureC}°C (!)",
+        "tooltip": true
+    },
+
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "BAT {capacity}%",
+        "format-charging": "CHG {capacity}%",
+        "format-plugged": "AC {capacity}%",
+        "format-full": "FULL",
+        "format-alt": "{time} {power:.1f}W",
+        "tooltip-format": "{timeTo}\n{power:.2f}W | {health}% health",
+        "interval": 10
+    },
+
+    "network": {
+        "interface": "enp*",
+        "interval": 2,
+        "format-ethernet": "↓{bandwidthDownBytes} ↑{bandwidthUpBytes}",
+        "format-wifi": "↓{bandwidthDownBytes} ↑{bandwidthUpBytes} ({signalStrength}%)",
+        "format-linked": "ETH (No IP)",
+        "format-disconnected": "OFFLINE",
+        "format-alt": "{ifname}: {ipaddr}/{cidr}",
+        "tooltip-format": "{ifname} via {gwaddr}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ifname}: {ipaddr}/{cidr}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+        "tooltip-format-ethernet": "{ifname}: {ipaddr}/{cidr}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+        "on-click": "foot -e ~/.local/bin/netinfo",
+        "on-click-right": "foot -e ~/.local/bin/netinfo root",
+        "on-click-middle": "nm-connection-editor"
+    },
+
+    "pulseaudio": {
+        "format": "VOL {volume}%",
+        "format-bluetooth": "BT {volume}%",
+        "format-bluetooth-muted": "BT MUTE",
+        "format-muted": "MUTE",
+        "format-source": "MIC {volume}%",
+        "format-source-muted": "MIC OFF",
+        "on-click": "pamixer -t",
+        "on-click-middle": "pamixer -t",
+        "on-click-right": "pwvucontrol",
+        "on-scroll-up": "pamixer -i 2",
+        "on-scroll-down": "pamixer -d 2"
+    },
+
+    "mpris": {
+        "format": "{player_icon} {title}",
+        "format-paused": "{status_icon} {title}",
+        "max-length": 25,
+        "player-icons": {
+            "default": ">>",
+            "spotify": "SPT",
+            "firefox": "FF",
+            "chromium": "CHR"
+        },
+        "status-icons": {
+            "paused": "||"
+        },
+        "tooltip-format": "{player}: {artist} - {title}",
+        "on-click": "playerctl play-pause"
+    },
+
+    "custom/todo": {
+        "format": "TODO {}",
+        "interval": 10,
+        "exec": "~/.local/bin/waybar-todo count",
+        "on-click": "~/.local/bin/waybar-todo menu",
+        "on-click-right": "~/.local/bin/waybar-todo add",
+        "on-click-middle": "~/.local/bin/waybar-todo edit",
+        "tooltip": true,
+        "exec-on-event": true,
+        "return-type": "json"
+    }
+}

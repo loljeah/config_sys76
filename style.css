@@ -1,0 +1,236 @@
+/* Waybar Style - Cyberpunk Pink/Purple Theme */
+/* Place at: ~/.config/waybar/style.css */
+
+* {
+    font-family: "Roboto", "Roboto Mono", sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    min-height: 0;
+}
+
+window#waybar {
+    background-color: rgba(26, 15, 38, 0.96);
+    border-top: 2px solid #ff2de2;
+    color: #e0e0e0;
+    transition-property: background-color;
+    transition-duration: .5s;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+button {
+    box-shadow: inset 0 -2px transparent;
+    border: none;
+    border-radius: 0;
+}
+
+button:hover {
+    background: inherit;
+    box-shadow: inset 0 -2px #00ffff;
+}
+
+#workspaces button {
+    padding: 0 6px;
+    background-color: transparent;
+    color: #c0c0c0;
+}
+
+#workspaces button:hover {
+    background: rgba(255, 45, 226, 0.3);
+}
+
+#workspaces button.focused {
+    background-color: #bd00ff;
+    box-shadow: inset 0 -2px #ff2de2;
+    color: #ffffff;
+}
+
+#workspaces button.urgent {
+    background-color: #ff0055;
+}
+
+#mode {
+    background-color: #bd00ff;
+    padding: 0 8px;
+    margin: 0 4px;
+}
+
+#scratchpad {
+    background-color: #3d1a3d;
+    padding: 0 6px;
+}
+
+#scratchpad.empty {
+    background-color: transparent;
+}
+
+#window {
+    color: #00ffff;
+    padding: 0 8px;
+}
+
+/* Taskbar - grouped windows */
+#taskbar {
+    padding: 0 2px;
+}
+
+#taskbar button {
+    padding: 0 4px;
+    margin: 1px;
+    background-color: #2d1f3d;
+    border-radius: 2px;
+}
+
+#taskbar button:hover {
+    background-color: #6b2d6b;
+}
+
+#taskbar button.active {
+    background-color: #bd00ff;
+}
+
+#taskbar button.minimized {
+    background-color: #1a0f26;
+    opacity: 0.6;
+}
+
+#clock,
+#cpu,
+#memory,
+#disk,
+#temperature,
+#battery,
+#network,
+#pulseaudio,
+#tray,
+#idle_inhibitor,
+#mpris {
+    padding: 0 8px;
+    margin: 0 1px;
+    color: #00ffff;
+}
+
+#clock {
+    background-color: #bd00ff;
+    font-weight: bold;
+    color: #00ffff;
+}
+
+#cpu {
+    background-color: #3d1a3d;
+}
+
+#memory {
+    background-color: #3d1a3d;
+}
+
+#disk {
+    background-color: #3d1a3d;
+}
+
+#temperature {
+    background-color: #3d1a3d;
+}
+
+#temperature.critical {
+    background-color: #ff0055;
+}
+
+#battery {
+    background-color: #3d1a3d;
+}
+
+#battery.charging, #battery.plugged {
+    background-color: #26a65b;
+    color: #ffffff;
+}
+
+#battery.warning:not(.charging) {
+    background-color: #f39c12;
+    color: #1a0f26;
+}
+
+#battery.critical:not(.charging) {
+    background-color: #ff0055;
+    animation: blink 0.5s linear infinite alternate;
+}
+
+@keyframes blink {
+    to {
+        background-color: #1a0f26;
+        color: #ff0055;
+    }
+}
+
+#network {
+    background-color: #3d1a3d;
+    min-width: 100px;
+}
+
+#network.disconnected {
+    background-color: #ff0055;
+}
+
+#pulseaudio {
+    background-color: #3d1a3d;
+}
+
+#pulseaudio.muted {
+    background-color: #ff0055;
+}
+
+#tray {
+    background-color: #2d1f3d;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+    background-color: #ff0055;
+}
+
+#idle_inhibitor {
+    background-color: #3d1a3d;
+}
+
+#idle_inhibitor.activated {
+    background-color: #00ffff;
+    color: #1a0f26;
+}
+
+#mpris {
+    background-color: #6b2d6b;
+}
+
+#custom-todo {
+    background-color: #3d1a3d;
+    padding: 0 8px;
+    margin: 0 1px;
+    color: #00ffff;
+}
+
+#custom-todo.has-tasks {
+    background-color: #bd00ff;
+    color: #ffffff;
+}
+
+#custom-todo.empty {
+    background-color: #2d1f3d;
+    color: #808080;
+}
+
+tooltip {
+    background-color: #2d1f3d;
+    border: 1px solid #ff2de2;
+    border-radius: 0;
+}
+
+tooltip label {
+    color: #00ffff;
+    font-family: "Roboto", sans-serif;
+}

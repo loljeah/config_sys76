@@ -1,0 +1,47 @@
+# Hypr Configuration - Monitor definitions for hyprlock
+# Place at: ~/.config/hypr/config
+#
+# This file provides monitor definitions that hyprlock uses
+# for proper screen placement. The main WM is Sway, but hyprlock
+# reads this for monitor awareness.
+
+# Laptop internal display - 4K @ 120Hz with 1.5 scale
+monitor = eDP-1, 3840x2160@120, 0x0, 1.5
+
+# External monitor (when connected) - 4K @ 120Hz with 1.5 scale
+monitor = DP-1, 3840x2160@120, 2560x0, 1.5
+
+# Fallback for any unmatched monitor
+monitor = , preferred, auto, 1.5
+
+# Input configuration
+input {
+    kb_layout = us
+    follow_mouse = 1
+    sensitivity = 0
+}
+
+# General settings
+general {
+    gaps_in = 5
+    gaps_out = 2
+    border_size = 2
+    col.active_border = rgb(ff2de2)
+    col.inactive_border = rgb(2d1f3d)
+}
+
+# Decoration (matches Sway theme)
+decoration {
+    rounding = 0
+    blur {
+        enabled = true
+        size = 4
+        passes = 1
+    }
+}
+
+# Misc
+misc {
+    disable_hyprland_logo = true
+    disable_splash_rendering = true
+}

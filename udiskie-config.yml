@@ -1,0 +1,68 @@
+# Udiskie Configuration
+# Place at: ~/.config/udiskie/config.yml
+
+program_options:
+  automount: true
+  notify: true
+  tray: true
+  file_manager: thunar
+
+# Device options - force RW mounting
+device_config:
+  - id_type: filesystem
+    options:
+      - rw
+      - noatime
+      - users
+
+# Specific options for common filesystems
+# NTFS
+  - id_type: ntfs
+    options:
+      - rw
+      - noatime
+      - uid=1000
+      - gid=100
+      - dmask=022
+      - fmask=133
+      - windows_names
+
+# exFAT
+  - id_type: exfat
+    options:
+      - rw
+      - noatime
+      - uid=1000
+      - gid=100
+      - dmask=022
+      - fmask=133
+
+# FAT32/VFAT
+  - id_type: vfat
+    options:
+      - rw
+      - noatime
+      - uid=1000
+      - gid=100
+      - dmask=022
+      - fmask=133
+      - shortname=mixed
+
+# ext4 (Linux)
+  - id_type: ext4
+    options:
+      - rw
+      - noatime
+
+# Notification settings
+notification_actions:
+  device_mounted:
+    - action: browse
+      label: Browse
+    - action: terminal
+      label: Terminal
+
+icon_names:
+  media: drive-removable-media
+  optical: media-optical
+  smart: drive-harddisk

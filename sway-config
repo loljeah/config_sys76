@@ -1,0 +1,341 @@
+# Sway configuration
+# Place this file at: ~/.config/sway/config
+
+#######################
+# Variables
+#######################
+set $mod Mod4
+set $left h
+set $down j
+set $up k
+set $right l
+set $term foot
+set $menu rofi -show drun -show-icons
+set $file_manager thunar
+
+# Screenshot variables
+set $screenshot_full grim ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png && notify-send "Screenshot saved"
+set $screenshot_region grim -g "$(slurp)" ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png && notify-send "Screenshot saved"
+set $screenshot_edit grim -g "$(slurp)" - | swappy -f -
+
+#######################
+# Output (Monitors)
+#######################
+# Triple monitor setup - managed by kanshi for automatic profiles
+# Manual fallback (uncomment if kanshi doesn't work):
+# output DP-2 mode 2560x1440@99.90Hz position 0,0 transform 90
+# output HDMI-A-1 mode 1920x1080@239.76Hz position 1440,740
+# output DP-3 mode 1280x1024@60Hz position 3360,640 transform 90
+
+# Workspace assignments
+# Left monitor (DP-2, portrait): workspaces 1-3
+workspace 1 output DP-2
+workspace 2 output DP-2
+workspace 3 output DP-2
+
+# Center monitor (HDMI-A-1, primary): workspaces 4-7
+workspace 4 output HDMI-A-1
+workspace 5 output HDMI-A-1
+workspace 6 output HDMI-A-1
+workspace 7 output HDMI-A-1
+
+# Right monitor (DP-3, portrait): workspaces 8-10
+workspace 8 output DP-3
+workspace 9 output DP-3
+workspace 10 output DP-3
+
+# Initial wallpaper fallback (swww will override this)
+output * bg #0a0a12 solid_color
+
+#######################
+# Input
+#######################
+input type:keyboard {
+    xkb_layout us
+}
+
+input type:pointer {
+    accel_profile flat
+}
+
+#######################
+# Appearance
+#######################
+# Gaps
+gaps inner 5
+gaps outer 2
+
+# Borders
+default_border pixel 2
+default_floating_border pixel 2
+
+# Colors (Cyberpunk Pink/Purple theme)
+# class                 border  backgr. text    indicator child_border
+client.focused          #ff2de2 #bd00ff #e0e0e0 #00ffff   #ff2de2
+client.focused_inactive #6b2d6b #3d1a3d #c0c0c0 #6b2d6b   #6b2d6b
+client.unfocused        #2d1f3d #1a0f26 #808080 #2d1f3d   #2d1f3d
+client.urgent           #ff0055 #ff0055 #ffffff #ff0055   #ff0055
+
+#######################
+#######################
+# Idle & Lock with Hyprlock Matrix Shader
+#######################
+# Flow:
+#   1. Idle 2 h      -> Hyprlock with Matrix shader
+#   2. Idle 2 h 10 m -> Screen power off
+#   3. Sleep         -> Immediate lock
+
+exec swayidle -w \
+    timeout 7200 'hyprlock' \
+    timeout 7800 'swaymsg "output * power off"' \
+        resume 'swaymsg "output * power on"' \
+    before-sleep 'hyprlock'
+
+#######################
+# Autostart
+#######################
+# Notification daemon
+exec mako
+
+# Kanshi for multi-monitor management
+exec kanshi
+
+# Network manager applet
+exec nm-applet --indicator
+
+# USB automount with tray icon and notifications
+# Mount with RW permissions, use ntfs-3g for NTFS
+exec udiskie --automount --notify --tray --file-manager thunar
+
+# Clipboard history daemon
+exec wl-paste --type text --watch cliphist store
+exec wl-paste --type image --watch cliphist store
+
+# Polkit agent (for GUI privilege escalation)
+exec /run/current-system/sw/libexec/polkit-gnome-authentication-agent-1
+
+# Create screenshots directory
+exec mkdir -p ~/Pictures/Screenshots
+
+# Dynamic wallpaper with swww (NASA APOD)
+# Start swww daemon, then fetch today's NASA Astronomy Picture of the Day
+exec_always swww-daemon
+exec sleep 2 && ~/.local/bin/nasa-wallpaper
+
+# Optional: Wallpaper rotation mode (uncomment for 30-minute rotation)
+# exec ~/.local/bin/nasa-wallpaper loop
+
+#######################
+# Keybindings - General
+#######################
+# Start terminal
+bindsym $mod+Return exec $term
+
+# Start launcher
+bindsym $mod+d exec $menu
+
+# Start file manager
+bindsym $mod+e exec $file_manager
+
+# Kill focused window
+bindsym $mod+Shift+q kill
+
+# Reload config
+bindsym $mod+Shift+c reload
+
+# Exit sway
+bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit sway?' -B 'Yes' 'swaymsg exit'
+
+# Lock screen with Matrix shader
+bindsym $mod+Escape exec hyprlock
+
+# Clipboard history
+# Clipboard history (Shift+v to avoid conflict with splitv)
+bindsym $mod+Shift+v exec cliphist list | rofi -dmenu -p "Clipboard" | cliphist decode | wl-copy
+
+# Change wallpaper (random NASA APOD)
+bindsym $mod+Shift+w exec ~/.local/bin/nasa-wallpaper random
+
+#######################
+# Keybindings - Screenshots
+#######################
+# Full screen screenshot
+bindsym Print exec $screenshot_full
+
+# Region screenshot
+bindsym Shift+Print exec $screenshot_region
+
+# Region screenshot with edit (swappy)
+bindsym $mod+Print exec $screenshot_edit
+
+# Alternative: Ctrl+Shift+S for region (like flameshot)
+bindsym Control+Shift+s exec $screenshot_edit
+
+#######################
+# Keybindings - Media
+#######################
+bindsym XF86AudioRaiseVolume exec pamixer -i 5
+bindsym XF86AudioLowerVolume exec pamixer -d 5
+bindsym XF86AudioMute exec pamixer -t
+bindsym XF86AudioMicMute exec pamixer --default-source -t
+
+bindsym XF86MonBrightnessUp exec brightnessctl set +5%
+bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
+
+bindsym XF86AudioPlay exec playerctl play-pause
+bindsym XF86AudioNext exec playerctl next
+bindsym XF86AudioPrev exec playerctl previous
+
+#######################
+# Keybindings - Navigation
+#######################
+# Move focus
+bindsym $mod+$left focus left
+bindsym $mod+$down focus down
+bindsym $mod+$up focus up
+bindsym $mod+$right focus right
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+# Move windows
+bindsym $mod+Shift+$left move left
+bindsym $mod+Shift+$down move down
+bindsym $mod+Shift+$up move up
+bindsym $mod+Shift+$right move right
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+#######################
+# Keybindings - Workspaces
+#######################
+# Switch to workspace
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+bindsym $mod+5 workspace number 5
+bindsym $mod+6 workspace number 6
+bindsym $mod+7 workspace number 7
+bindsym $mod+8 workspace number 8
+bindsym $mod+9 workspace number 9
+bindsym $mod+0 workspace number 10
+
+# Move focused container to workspace
+bindsym $mod+Shift+1 move container to workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4
+bindsym $mod+Shift+5 move container to workspace number 5
+bindsym $mod+Shift+6 move container to workspace number 6
+bindsym $mod+Shift+7 move container to workspace number 7
+bindsym $mod+Shift+8 move container to workspace number 8
+bindsym $mod+Shift+9 move container to workspace number 9
+bindsym $mod+Shift+0 move container to workspace number 10
+
+#######################
+# Keybindings - Layout
+#######################
+bindsym $mod+b splith
+bindsym $mod+v splitv
+
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+t layout toggle split
+
+bindsym $mod+f fullscreen
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+bindsym $mod+a focus parent
+
+#######################
+# Keybindings - Scratchpad
+#######################
+bindsym $mod+Shift+minus move scratchpad
+bindsym $mod+minus scratchpad show
+
+#######################
+# Resize Mode
+#######################
+mode "resize" {
+    bindsym $left resize shrink width 10px
+    bindsym $down resize grow height 10px
+    bindsym $up resize shrink height 10px
+    bindsym $right resize grow width 10px
+
+    bindsym Left resize shrink width 10px
+    bindsym Down resize grow height 10px
+    bindsym Up resize shrink height 10px
+    bindsym Right resize grow width 10px
+
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+bindsym $mod+r mode "resize"
+
+#######################
+# Gaming - Force to Samsung Display (HDMI-A-1 = workspace 5)
+#######################
+# Steam client and games
+for_window [class="^steam$"] move container to workspace 5
+for_window [class="^Steam$"] move container to workspace 5
+for_window [class="^steam_app_.*$"] move container to workspace 5, fullscreen enable
+
+# Lutris and Wine games
+for_window [class="^lutris$"] move container to workspace 5
+for_window [class="^Lutris$"] move container to workspace 5
+for_window [class="^wine$"] move container to workspace 5, fullscreen enable
+for_window [class="^Wine$"] move container to workspace 5, fullscreen enable
+for_window [class="\.exe$"] move container to workspace 5, fullscreen enable
+
+# Gamescope (Steam wrapper)
+for_window [class="^gamescope$"] move container to workspace 5, fullscreen enable
+for_window [app_id="^gamescope$"] move container to workspace 5, fullscreen enable
+
+#######################
+# Floating rules
+#######################
+for_window [app_id="foot"] opacity 0.85
+
+for_window [app_id="pwvucontrol"] floating enable
+for_window [app_id="nm-connection-editor"] floating enable
+for_window [app_id="blueman-manager"] floating enable
+for_window [app_id="wdisplays"] floating enable
+for_window [app_id="org.keepassxc.KeePassXC"] floating enable
+for_window [app_id="yubioath-flutter"] floating enable
+for_window [class="Arandr"] floating enable
+for_window [app_id="swappy"] floating enable
+for_window [window_type="dialog"] floating enable
+for_window [window_role="dialog"] floating enable
+
+# File dialogs - prevent fullscreen tiling, constrain size
+for_window [app_id="xdg-desktop-portal-gtk"] floating enable, resize set 900 600
+for_window [app_id="xdg-desktop-portal-gnome"] floating enable, resize set 900 600
+for_window [title="^Open File$"] floating enable, resize set 900 600
+for_window [title="^Save File$"] floating enable, resize set 900 600
+for_window [title="^Open$"] floating enable, resize set 900 600
+for_window [title="^Save$"] floating enable, resize set 900 600
+for_window [title="^Save As$"] floating enable, resize set 900 600
+for_window [title="^Select"] floating enable, resize set 900 600
+for_window [title="^Choose"] floating enable, resize set 900 600
+for_window [title="^File Upload"] floating enable, resize set 900 600
+for_window [title="^Export"] floating enable, resize set 900 600
+for_window [title="^Import"] floating enable, resize set 900 600
+
+# Disk utilities
+for_window [app_id="gnome-disks"] floating enable
+for_window [class="GParted"] floating enable
+for_window [class="Gparted"] floating enable
+
+#######################
+# Status Bar
+#######################
+bar {
+    swaybar_command waybar
+}
+
+# Include any additional config files
+include /etc/sway/config.d/*

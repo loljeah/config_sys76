@@ -1,0 +1,43 @@
+# Sensitive files
+*.key
+*.pem
+.env
+secrets/
+*credentials*
+*secret*
+
+# Backup files
+*.bak
+*.backup
+*~
+bak/
+
+# Temp files
+*.tmp
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+venv/
+.venv/
+
+# Nix build outputs
+result
+result-*
+
+# Lock files (keep flake.lock for Nix reproducibility)
+*.lock
+!flake.lock

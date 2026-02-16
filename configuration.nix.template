@@ -1,0 +1,769 @@
+# NixOS Configuration - Sway (Wayland)
+# Migrated from XFCE (Xorg)
+
+{ config, pkgs, lib, ... }:
+
+let
+  signal-desktop-desktopitem = pkgs.makeDesktopItem {
+    name = "signal-desktop";
+    desktopName = "Signal";
+    exec = "${pkgs.signal-desktop}/bin/signal-desktop %U";
+    icon = "signal-desktop";
+    type = "Application";
+    terminal = false;
+    categories = [ "Network" "InstantMessaging" "Chat" ];
+    mimeTypes = [ "x-scheme-handler/sgnl" "x-scheme-handler/signalcaptcha" ];
+    startupWMClass = "Signal";
+  };
+
+in
+{
+  imports =
+    [
+      ./hardware-configuration.nix
+    ];
+
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;  # Required for Wine/Proton 32-bit games and gamemode
+    extraPackages = with pkgs; [
+      rocmPackages.clr.icd
+      # VA-API for hardware video decoding
+      libva
+      libva-utils  # vainfo tool
+      libvdpau-va-gl
+    ];
+    extraPackages32 = with pkgs.pkgsi686Linux; [
+      libva
+    ];
+  };
+
+  # Hardware acceleration for browsers
+  environment.sessionVariables = {
+    LIBVA_DRIVER_NAME = "radeonsi";
+    DEFAULT_BROWSER = "chromium";
+    # Gamemode library path for Steam Runtime/pressure-vessel (Lutris/umu)
+    LD_PRELOAD = "";  # Clear any conflicting preloads
+  };
+
+  # Disable SSH askpass completely - use terminal for password prompts
+  environment.variables = {
+    SSH_ASKPASS = "";
+    SSH_ASKPASS_REQUIRE = "never";
+  };
+
+
+  # Bootloader
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # XanMod kernel with AMD optimizations
+  boot.kernelPackages = pkgs.linuxPackages_xanmod_latest;
+
+  boot.kernelModules = [ "v4l2loopback" "ntfs3" "amdgpu" ];
+  boot.extraModulePackages = [ config.boot.kernelPackages.v4l2loopback ];
+  # aarch64 emulation for cross-compiling/chroot (e.g., Raspberry Pi images)
+  boot.binfmt = {
+    emulatedSystems = [ "aarch64-linux" ];
+    # Static emulators required for systemd-nspawn/chroot to work with foreign arch
+    preferStaticEmulators = true;
+  };
+  # AMD GPU kernel parameters for RX 6600 (RDNA2)
+  boot.kernelParams = [
+    # AMD GPU
+    "amdgpu.ppfeaturemask=0xffffffff"  # Enable all power management features (OC/UV)
+    "amdgpu.dc=1"                       # Display Core (better multi-monitor, FreeSync)
+    "amdgpu.dpm=1"                      # Dynamic Power Management
+    "amdgpu.runpm=0"                    # Disable runtime PM (prevents stuttering on dGPU)
+    "amdgpu.audio=0"                    # Disable HDMI audio via GPU (use onboard)
+
+    # Low-latency gaming optimizations
+    "preempt=full"                      # Full kernel preemption (lower latency)
+    "threadirqs"                        # Threaded IRQ handlers
+    "tsc=reliable"                      # Trust TSC for timekeeping
+    "clocksource=tsc"                   # Use TSC clocksource (lowest latency)
+    "idle=nomwait"                      # Disable mwait (faster C-state exit)
+    "processor.max_cstate=1"            # Limit C-states (reduces latency spikes)
+    "intel_pstate=disable"              # Not needed for AMD, but harmless
+
+    # Memory/IOMMU
+    "transparent_hugepage=never"        # Disable THP (reduces latency variance)
+    "mitigations=off"                   # Disable CPU mitigations (gaming perf, accept risk)
+  ];
+  
+  # Support user mounts
+  boot.supportedFilesystems = [ "ntfs" "exfat" "vfat" "ext4" "btrfs" ];
+
+  boot.extraModprobeConfig = ''
+    options v4l2loopback devices=1 video_nr=1 card_label="OBS Cam" exclusive_caps=1
+  '';
+   
+  nix.settings.experimental-features = [ "nix-command" "flakes" ]; 
+
+  networking.hostName = "no";
+  networking.networkmanager.enable = true;
+
+  # Time zone
+  time.timeZone = "Europe/Vienna";
+
+  # Internationalisation
+  i18n.defaultLocale = "en_GB.UTF-8";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "de_AT.UTF-8";
+    LC_IDENTIFICATION = "de_AT.UTF-8";
+    LC_MEASUREMENT = "de_AT.UTF-8";
+    LC_MONETARY = "de_AT.UTF-8";
+    LC_NAME = "de_AT.UTF-8";
+    LC_NUMERIC = "de_AT.UTF-8";
+    LC_PAPER = "de_AT.UTF-8";
+    LC_TELEPHONE = "de_AT.UTF-8";
+    LC_TIME = "de_AT.UTF-8";
+  };
+
+  # Security
+  security.polkit.enable = true;
+  security.rtkit.enable = true;
+
+  # Required for Sway
+  security.pam.services.swaylock = {};
+  security.pam.services.hyprlock = {};
+
+  # GNOME Keyring disabled - not using VS Code Remote-SSH anymore
+  services.gnome.gnome-keyring.enable = false;
+
+  # iOS device support
+  services.usbmuxd = {
+    enable = true;
+    package = pkgs.usbmuxd2;
+  };
+
+  # Firmware updates (fwupd)
+  services.fwupd.enable = true;
+
+  # Printing
+  services.printing.enable = true;
+
+  # PipeWire audio
+  services.pulseaudio.enable = false;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  # Thumbnail support
+  services.tumbler.enable = true;
+
+  # USB/SD card automounting
+  services.gvfs.enable = true;
+  services.udisks2 = {
+    enable = true;
+    mountOnMedia = true;  # Mount to /media instead of /run/media
+    settings = {
+      # Default mount options for all filesystems
+      "udisks2.conf" = {
+        defaults = {
+          # Allow all users to mount
+          auth_admin_keep = "always";
+        };
+        udisks2 = {
+          modules = [ "*" ];
+          modules_load_preference = "ondemand";
+        };
+      };
+    };
+  };
+
+  # Polkit rules for passwordless mounting and formatting of removable media
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if ((action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
+           action.id == "org.freedesktop.udisks2.filesystem-mount" ||
+           action.id == "org.freedesktop.udisks2.filesystem-mount-other-seat" ||
+           action.id == "org.freedesktop.udisks2.filesystem-unmount-others" ||
+           action.id == "org.freedesktop.udisks2.eject-media" ||
+           action.id == "org.freedesktop.udisks2.power-off-drive" ||
+           action.id == "org.freedesktop.udisks2.encrypted-unlock" ||
+           action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
+           action.id == "org.freedesktop.udisks2.loop-setup") &&
+          subject.isInGroup("wheel") &&
+          subject.user == "ljsm") {
+        return polkit.Result.YES;
+      }
+    });
+
+    /* Disk formatting requires auth (password prompt) for safety */
+    polkit.addRule(function(action, subject) {
+      if ((action.id == "org.freedesktop.udisks2.modify-device" ||
+           action.id == "org.freedesktop.udisks2.modify-device-system" ||
+           action.id == "org.freedesktop.udisks2.rescan" ||
+           action.id == "org.freedesktop.udisks2.ata-smart-update" ||
+           action.id == "org.freedesktop.udisks2.ata-smart-simulate") &&
+          subject.isInGroup("wheel") &&
+          subject.user == "ljsm") {
+        return polkit.Result.AUTH_ADMIN_KEEP;
+      }
+    });
+
+    /* CoreCtrl - allow GPU control without password for wheel users */
+    polkit.addRule(function(action, subject) {
+      if ((action.id == "org.corectrl.helper.init" ||
+           action.id == "org.corectrl.helperkiller.init") &&
+          subject.local == true &&
+          subject.active == true &&
+          subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+      }
+    });
+  '';
+
+  # Udev rules for proper permissions on removable media
+  services.udev.extraRules = ''
+    # Allow users in storage/plugdev group to access removable media
+    SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", GROUP="users", MODE="0660"
+    # USB drives
+    KERNEL=="sd[a-z]*", SUBSYSTEMS=="usb", GROUP="users", MODE="0660"
+    # SD cards
+    KERNEL=="mmcblk[0-9]*", SUBSYSTEMS=="mmc", GROUP="users", MODE="0660"
+  '';
+
+  # PlatformIO udev rules for USB programmers (Arduino, ESP, STM32, etc.)
+  services.udev.packages = [ pkgs.platformio-core.udev ];
+
+  # Allow FUSE user mounts
+  programs.fuse.userAllowOther = true;
+
+  # D-Bus (required for many Wayland components)
+  services.dbus.enable = true;
+
+  # No display manager - login via TTY then run 'sway'
+  # Auto-start sway on TTY1 login (add to ~/.bash_profile or ~/.zprofile):
+  #   if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = "1" ]; then
+  #     exec sway
+  #   fi
+
+  # Optional: Auto-login on TTY1 (uncomment to enable)
+  # services.getty.autologinUser = "ljsm";
+
+  # XDG portal for Wayland screen sharing, file dialogs, etc.
+  xdg.portal = {
+    enable = true;
+    wlr.enable = true;
+    xdgOpenUsePortal = true;  # Required for sandboxed apps (firejail) to open URLs
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+  };
+
+  # Fonts
+  fonts.packages = with pkgs; [
+    noto-fonts
+    noto-fonts-cjk-sans
+    noto-fonts-color-emoji
+    liberation_ttf
+    fira-code
+    fira-code-symbols
+    mplus-outline-fonts.githubRelease
+    dina-font
+    proggyfonts
+    terminus_font
+    terminus_font_ttf
+    roboto
+    roboto-mono
+    jetbrains-mono        # For hyprlock cyberpunk terminal look
+    nerd-fonts.jetbrains-mono  # Nerd font variant with icons
+    nerd-fonts.fira-code
+  ];
+
+  # Enable font configuration
+  fonts.fontconfig = {
+    enable = true;
+    defaultFonts = {
+      monospace = [ "Terminus" ];
+    };
+  };
+  
+
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      # Gaming libraries for pressure-vessel/Steam Runtime
+      gamemode
+      # 32-bit gamemode for Wine
+      pkgsi686Linux.gamemode
+    ];
+  };
+  # User account
+  users.users.ljsm = {
+    isNormalUser = true;
+    description = "ljsm";
+    extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "docker" "video" "input" "storage" "users" "render" "libvirtd" "kvm" ];
+    packages = with pkgs; [
+
+      # Development / Editors
+      vscode
+      arduino
+      arduino-ide
+      nodejs_22
+      gh
+      platformio-core
+      avrdude
+      python3
+      esptool
+      zlib
+      libusb1
+
+
+      #AI-CODE
+      claude-code
+                   # GitHub CLI
+      
+     
+      # Office / Productivity
+      libreoffice
+      keepassxc
+      calibre
+
+      # Graphics / 3D
+      openscad
+      blender
+      gimp
+      orca-slicer
+      cura
+
+      # Media
+      freetube
+      vlc
+      handbrake
+      losslesscut-bin
+      audacity
+      obs-studio
+      obs-studio-plugins.wlrobs  # Wayland screen capture for OBS
+      mplayer
+      yt-dlp
+      streamripper
+
+      # Internet / Communication
+      chromium
+      discord        # Not firejailed - causes subprocess issues with Electron
+      vesktop        # Discord alternative with better Wayland support
+      remmina
+      magic-wormhole
+
+      # Gaming / Emulation
+      mesen
+      lutris
+      wine
+      winetricks
+      # gamemode provided by programs.gamemode.enable
+      mangohud
+      wine-wayland
+      dxvk
+      umu-launcher  # UMU launcher for non-Steam Proton games
+      # corectrl provided by programs.corectrl.enable
+      lact          # LACT - alternative AMD GPU control (systemd service)
+
+
+      # System utilities
+      gparted
+      gnome-disk-utility
+      woeusb
+      woeusb-ng
+      rsync
+      bleachbit
+      hashrat
+
+      # Networking
+      wireshark
+      nmap
+      wg-netmanager
+      winbox
+      minicom
+
+      # Archive tools
+      unzip
+      unrar
+      rar
+      p7zip
+      xarchiver
+
+      # Security
+      yubioath-flutter
+
+      # iOS
+      libimobiledevice
+
+      # Misc
+      calc
+      deskflow
+      checkmate
+      nix-bash-completions
+      bash-completion
+
+      # ===== Wayland-specific replacements =====
+      
+      # Screenshot: grim + slurp + swappy (replaces flameshot)
+      grim          # Screenshot tool
+      slurp         # Region selection
+      swappy        # Annotation/edit tool
+
+      # Display management (replaces arandr)
+      wdisplays     # GUI display configuration
+      kanshi        # Automatic display profiles
+
+      # Application launcher
+      rofi
+
+      # Notification daemon
+      mako
+
+      # Terminal
+      foot
+
+      # Clipboard
+      wl-clipboard
+      cliphist      # Clipboard history
+
+      # Screen locking
+      swaylock
+      swayidle
+
+      # Brightness/volume controls
+      brightnessctl
+      pamixer
+      playerctl
+      pwvucontrol       # Wayland-native PipeWire volume control (replaces pavucontrol)
+
+      # Network manager applet (Wayland compatible)
+      networkmanagerapplet
+
+      # File manager (Thunar works on Wayland)
+      # Configured via programs.thunar below
+
+      # Wallpaper - swww for animated/dynamic wallpapers
+      swaybg
+      swww
+
+      # Image viewer (Wayland-native)
+      imv
+
+      # PDF viewer
+      zathura
+
+      # Graphical archiver (robust, wide format support)
+      file-roller
+      p7zip
+      unrar
+      unar            # Better RAR support
+      libarchive      # Backend for many formats
+
+      # Additional Wayland utilities
+      wev           # Wayland event viewer (like xev)
+      wlr-randr     # xrandr-like tool for wlroots
+
+      # Network bandwidth monitoring
+      bandwhich     # Terminal bandwidth monitor by process (tcpview-style)
+      nethogs       # Per-process bandwidth monitor
+
+      # Lock screen with shader support
+      hyprlock
+
+      # USB automount with tray icon
+      udiskie
+    ];
+  };
+
+
+  # Thunar file manager
+  programs.thunar = {
+    enable = true;
+    plugins = with pkgs.xfce; [
+      thunar-archive-plugin
+      thunar-volman
+      thunar-media-tags-plugin
+    ];
+  };
+  programs.xfconf.enable = true;
+
+  # Sway window manager
+  programs.sway = {
+    enable = true;
+    wrapperFeatures.gtk = true;
+    extraPackages = with pkgs; [
+      swaylock
+      swayidle
+      swaybg
+      swww          # Animated wallpaper daemon
+      waybar
+      wl-clipboard
+      mako
+      grim
+      slurp
+      foot
+      rofi
+      kanshi
+    ];
+    extraSessionCommands = ''
+      export SDL_VIDEODRIVER=wayland
+      export QT_QPA_PLATFORM=wayland
+      export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
+      export _JAVA_AWT_WM_NONREPARENTING=1
+      export MOZ_ENABLE_WAYLAND=1
+      export XDG_CURRENT_DESKTOP=sway
+      export XDG_SESSION_DESKTOP=sway
+    '';
+  };
+
+  # Enable dconf (needed for GTK apps settings)
+  programs.dconf.enable = true;
+
+  # Steam gaming
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true;
+    dedicatedServer.openFirewall = true;
+    gamescopeSession.enable = true;
+    # Expose gamemode lib to pressure-vessel/Steam Runtime
+    extraPackages = with pkgs; [
+      gamemode
+    ];
+    extraCompatPackages = with pkgs; [
+      proton-ge-bin  # GE-Proton from nixpkgs (alternative to manual install)
+    ];
+  };
+
+  # Gamescope compositor for gaming
+  programs.gamescope = {
+    enable = true;
+    capSysNice = false;  # Disable caps to avoid bwrap conflict with umu
+  };
+
+  # Gamemode for better gaming performance
+  programs.gamemode = {
+    enable = true;
+    enableRenice = true;
+    settings = {
+      general = {
+        renice = 10;
+        softrealtime = "auto";
+        ioprio = 0;               # Highest I/O priority
+        inhibit_screensaver = 1;
+      };
+      gpu = {
+        apply_gpu_optimisations = "accept-responsibility";
+        gpu_device = 0;
+        amd_performance_level = "high";  # Force high performance mode
+      };
+      cpu = {
+        park_cores = "no";
+        pin_cores = "yes";
+      };
+      custom = {
+        # Commands run when gamemode starts/stops
+        start = "${pkgs.libnotify}/bin/notify-send 'GameMode' 'Performance mode enabled'";
+        end = "${pkgs.libnotify}/bin/notify-send 'GameMode' 'Performance mode disabled'";
+      };
+    };
+  };
+
+  # CoreCtrl - AMD GPU overclocking/undervolting GUI
+  programs.corectrl = {
+    enable = true;
+    gpuOverclock = {
+      enable = true;
+      ppfeaturemask = "0xffffffff";  # Already in kernel params but needed here too
+    };
+  };
+
+  # Bash completion (includes nix command completions)
+  programs.bash.completion.enable = true;
+
+  # Default applications (MIME types)
+  xdg.mime = {
+    enable = true;
+    defaultApplications = {
+      "application/pdf" = "org.pwmt.zathura.desktop";
+      "image/png" = "imv.desktop";
+      "image/jpeg" = "imv.desktop";
+      "image/gif" = "imv.desktop";
+      "image/webp" = "imv.desktop";
+      "image/bmp" = "imv.desktop";
+      "application/zip" = "org.gnome.FileRoller.desktop";
+      "application/x-tar" = "org.gnome.FileRoller.desktop";
+      "application/x-compressed-tar" = "org.gnome.FileRoller.desktop";
+      "application/x-7z-compressed" = "org.gnome.FileRoller.desktop";
+      "application/x-rar" = "org.gnome.FileRoller.desktop";
+      # Ungoogled Chromium as default browser
+      "text/html" = "chromium-browser.desktop";
+      "x-scheme-handler/http" = "chromium-browser.desktop";
+      "x-scheme-handler/https" = "chromium-browser.desktop";
+      "x-scheme-handler/about" = "chromium-browser.desktop";
+      "x-scheme-handler/unknown" = "chromium-browser.desktop";
+      "application/xhtml+xml" = "chromium-browser.desktop";
+    };
+  };
+
+  # XFCE helpers config - sets default terminal for Thunar "Open Terminal Here"
+  environment.etc."xdg/xfce4/helpers.rc".text = ''
+    TerminalEmulator=foot
+  '';
+
+  # Docker
+  virtualisation.docker.enable = true;
+
+  # Libvirt / QEMU / KVM
+  virtualisation.libvirtd = {
+    enable = true;
+    qemu = {
+      package = pkgs.qemu_kvm;
+      runAsRoot = true;
+      swtpm.enable = true;  # TPM emulation for Windows 11
+    };
+  };
+  programs.virt-manager.enable = true;
+
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
+
+  # System packages
+  environment.systemPackages = with pkgs; [
+    wget
+    curl
+    nano
+    git
+    htop
+    iotop
+    pstree
+    lshw
+    lsof
+    duf
+    nload
+    openssl
+    pciutils
+    usbutils
+    usbguard
+    usbguard-notifier
+    wirelesstools
+    sshfs
+    exfatprogs      # exFAT support
+    util-linux
+    ntfs3g          # NTFS read/write support
+    dosfstools      # FAT/FAT32 support
+    mtools          # FAT filesystem utilities (mlabel, mformat, etc.)
+    bindfs
+    v4l-utils
+    jq              # JSON parser (for NASA wallpaper script)
+    fuse3           # FUSE support for user mounts
+    mtpfs           # MTP (Android phone) support
+    jmtpfs          # Better MTP support
+    cifs-utils      # SMB/CIFS mount support
+    samba           # SMB client (smbclient)
+
+    # Wayland essentials at system level
+    wayland
+    xwayland
+    wlroots
+
+    # Automounting support
+    gvfs
+    
+    # Polkit agent for GUI privilege escalation
+    polkit_gnome
+
+    # XFCE helpers for Thunar "Open Terminal Here"
+    xfce.exo
+
+    # Notifications (used by gamemode)
+    libnotify
+
+  ];
+
+  #####################################################################
+  # FIREJAIL
+  #####################################################################
+  programs.firejail = {
+    enable = true;
+    wrappedBinaries = {
+
+
+
+      chromium = {
+        executable = "${pkgs.ungoogled-chromium}/bin/chromium";
+        profile = "${pkgs.firejail}/etc/firejail/chromium.profile";
+        desktop = "${pkgs.ungoogled-chromium}/share/applications/chromium-browser.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita:dark"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.Desktop"
+          "--whitelist=~/gitZ"
+          "--whitelist=~/Downloads"
+        ];
+      };
+
+      librewolf = {
+        executable = "${pkgs.librewolf}/bin/librewolf";
+        profile = "${pkgs.firejail}/etc/firejail/librewolf.profile";
+        desktop = "${pkgs.librewolf}/share/applications/librewolf.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita:dark"
+          "--env=MOZ_ENABLE_WAYLAND=1"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--whitelist=~/gitZ"
+          "--whitelist=~/Downloads"
+        ];
+      };
+
+      signal-desktop = {
+        executable = "${pkgs.signal-desktop}/bin/signal-desktop";
+        profile = "${pkgs.firejail}/etc/firejail/signal-desktop.profile";
+        desktop = "${signal-desktop-desktopitem}/share/applications/signal-desktop.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita:dark"
+          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+        ];
+      };
+
+      # Discord removed from firejail - causes "can't run child process" errors
+      # when launched from app menu due to Electron's subprocess model conflicts.
+      # Discord has its own Electron sandbox anyway.
+
+      # Vesktop also removed from firejail - same Electron subprocess issues as Discord
+
+      freetube = {
+        executable = "${pkgs.freetube}/bin/freetube";
+        profile = "${pkgs.firejail}/etc/firejail/freetube.profile";
+        desktop = "${pkgs.freetube}/share/applications/freetube.desktop";
+        extraArgs = [
+          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+        ];
+      };
+
+      qbittorrent = {
+        executable = "${pkgs.qbittorrent-enhanced}/bin/qbittorrent";
+        profile = "${pkgs.firejail}/etc/firejail/qbittorrent.profile";
+        desktop = "${pkgs.qbittorrent-enhanced}/share/applications/org.qbittorrent.qBittorrent.desktop";
+      };
+    };
+  };
+
+
+
+  #####################################################################
+  # Firewall
+  #####################################################################
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [ ];
+    allowedUDPPorts = [ ];
+  };
+
+  #####################################################################
+  # Sudoers: Passwordless commands for RPi image building
+  # Used by build-image.sh for mounting images and copying closures
+  #####################################################################
+
+
+  system.stateVersion = "25.11";
+}

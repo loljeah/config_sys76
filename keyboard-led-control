@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# keyboard-led-control - System76 keyboard backlight control
+# Usage: keyboard-led-control [breath|solid|rainbow|off|status]
+
+set -euo pipefail
+
+# System76 keyboards expose controls via /sys/class/leds/
+# Common paths for System76 Launch/integrated keyboards
+LED_BASE="/sys/class/leds/system76_acpi::kbd_backlight"
+LED_COLOR="/sys/bus/iio/devices/iio:device0"  # Color control (if available)
+
+# Fallback for different kernel modules
+if [[ ! -d "$LED_BASE" ]]; then
+    LED_BASE="/sys/class/leds/system76::kbd_backlight"
+fi
+
+if [[ ! -d "$LED_BASE" ]]; then
+    # Try to find any system76 keyboard LED
+    LED_BASE=$(find /sys/class/leds -maxdepth 1 -name '*system76*kbd*' -type l 2>/dev/null | head -1 || true)
+fi
+
+set_brightness() {
+    local level="$1"
+    if [[ -f "$LED_BASE/brightness" ]]; then
+        echo "$level" | tee "$LED_BASE/brightness" > /dev/null
+    fi
+}
+
+get_max_brightness() {
+    if [[ -f "$LED_BASE/max_brightness" ]]; then
+        cat "$LED_BASE/max_brightness"
+    else
+        echo "100"
+    fi
+}
+
+# Breathing effect using a background loop
+breathing_effect() {
+    local max
+    max=$(get_max_brightness)
+    local step=5
+    local delay=0.05
+
+    # Create PID file for management
+    local pidfile="/tmp/kbd-breath.pid"
+
+    # Kill any existing breathing loop
+    if [[ -f "$pidfile" ]]; then
+        kill "$(cat "$pidfile")" 2>/dev/null || true
+        rm -f "$pidfile"
+    fi
+
+    # Start breathing loop in background
+    (
+        echo $$ > "$pidfile"
+        trap 'rm -f "$pidfile"; exit' EXIT INT TERM
+
+        while true; do
+            # Fade up
+            for ((i=0; i<=max; i+=step)); do
+                echo "$i" > "$LED_BASE/brightness" 2>/dev/null || exit
+                sleep "$delay"
+            done
+            # Fade down
+            for ((i=max; i>=0; i-=step)); do
+                echo "$i" > "$LED_BASE/brightness" 2>/dev/null || exit
+                sleep "$delay"
+            done
+            sleep 0.3
+        done
+    ) &
+
+    disown
+    echo "Keyboard breathing effect started (PID: $(cat "$pidfile" 2>/dev/null || echo 'unknown'))"
+}
+
+stop_breathing() {
+    local pidfile="/tmp/kbd-breath.pid"
+    if [[ -f "$pidfile" ]]; then
+        kill "$(cat "$pidfile")" 2>/dev/null || true
+        rm -f "$pidfile"
+        echo "Breathing effect stopped"
+    fi
+}
+
+solid_on() {
+    stop_breathing
+    local max
+    max=$(get_max_brightness)
+    set_brightness "$max"
+    echo "Keyboard backlight: solid ON (brightness: $max)"
+}
+
+turn_off() {
+    stop_breathing
+    set_brightness 0
+    echo "Keyboard backlight: OFF"
+}
+
+show_status() {
+    if [[ ! -d "$LED_BASE" ]]; then
+        echo "No System76 keyboard LED found"
+        echo "Searched paths:"
+        echo "  - /sys/class/leds/system76_acpi::kbd_backlight"
+        echo "  - /sys/class/leds/system76::kbd_backlight"
+        find /sys/class/leds -maxdepth 1 -name '*kbd*' -type l 2>/dev/null || true
+        exit 1
+    fi
+
+    echo "LED base: $LED_BASE"
+    echo "Current brightness: $(cat "$LED_BASE/brightness" 2>/dev/null || echo 'N/A')"
+    echo "Max brightness: $(get_max_brightness)"
+
+    if [[ -f "/tmp/kbd-breath.pid" ]]; then
+        echo "Breathing effect: ACTIVE (PID: $(cat /tmp/kbd-breath.pid))"
+    else
+        echo "Breathing effect: INACTIVE"
+    fi
+}
+
+# Check if LED control is available
+check_led() {
+    if [[ ! -d "$LED_BASE" ]]; then
+        echo "Error: No System76 keyboard LED found at $LED_BASE" >&2
+        echo "Try: keyboard-led-control status" >&2
+        exit 1
+    fi
+}
+
+case "${1:-status}" in
+    breath|breathing)
+        check_led
+        breathing_effect
+        ;;
+    solid|on)
+        check_led
+        solid_on
+        ;;
+    off)
+        check_led
+        turn_off
+        ;;
+    stop)
+        stop_breathing
+        ;;
+    status)
+        show_status
+        ;;
+    *)
+        echo "Usage: $0 [breath|solid|off|stop|status]"
+        echo ""
+        echo "Commands:"
+        echo "  breath   - Start breathing/pulsing effect"
+        echo "  solid    - Solid backlight at max brightness"
+        echo "  off      - Turn off backlight"
+        echo "  stop     - Stop breathing effect only"
+        echo "  status   - Show current LED status"
+        exit 1
+        ;;
+esac

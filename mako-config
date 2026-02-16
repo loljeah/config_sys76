@@ -1,0 +1,50 @@
+# Mako notification daemon configuration
+# Place at: ~/.config/mako/config
+
+# General
+max-visible=5
+sort=-time
+layer=overlay
+anchor=top-right
+
+# Appearance
+font=Terminus 11
+background-color=#3b4252
+text-color=#eceff4
+border-color=#5e81ac
+border-radius=0
+border-size=2
+padding=10
+margin=10
+width=350
+height=150
+
+# Behavior
+default-timeout=5000
+ignore-timeout=0
+icons=1
+max-icon-size=48
+icon-path=/usr/share/icons/Adwaita
+
+# Grouping
+group-by=app-name
+
+# Actions
+on-button-left=dismiss
+on-button-middle=none
+on-button-right=dismiss-all
+
+# Urgency styles
+[urgency=low]
+border-color=#4c566a
+default-timeout=3000
+
+[urgency=normal]
+border-color=#5e81ac
+default-timeout=5000
+
+[urgency=critical]
+border-color=#bf616a
+background-color=#bf616a
+text-color=#eceff4
+default-timeout=0

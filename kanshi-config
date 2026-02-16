@@ -1,0 +1,29 @@
+# Kanshi configuration - System76 Serval WS laptop
+# Place this file at ~/.config/kanshi/config
+
+# Laptop internal display - 4K @ 144Hz with 1.5 scale (effective 2560x1440)
+# Run 'swaymsg -t get_outputs' or 'wlr-randr' to find exact output name
+profile laptop {
+    output eDP-1 mode 3840x2160@144Hz position 0,0 scale 1.5
+}
+
+# Fallback for any single display - 4K @ 144Hz with 1.5 scale
+profile single {
+    output * mode 3840x2160@144Hz position 0,0 scale 1.5
+}
+
+# External monitor only (laptop lid closed)
+profile external {
+    output DP-1 mode 3840x2160@144Hz position 0,0 scale 1.5
+}
+
+# Dual monitor: laptop + external
+profile dual {
+    output eDP-1 mode 3840x2160@144Hz position 0,0 scale 1.5
+    output DP-1 mode 3840x2160@144Hz position 2560,0 scale 1.5
+}
+
+# Alternative profiles for different refresh rates (if 144Hz not available)
+# profile laptop-60hz {
+#     output eDP-1 mode 3840x2160@60Hz position 0,0 scale 1.5
+# }
