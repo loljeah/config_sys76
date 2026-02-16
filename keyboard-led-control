@@ -41,8 +41,8 @@ breathing_effect() {
     local step=5
     local delay=0.05
 
-    # Create PID file for management
-    local pidfile="/tmp/kbd-breath.pid"
+    # Create PID file for management (use XDG_RUNTIME_DIR for security, fallback to /tmp)
+    local pidfile="${XDG_RUNTIME_DIR:-/tmp}/kbd-breath.pid"
 
     # Kill any existing breathing loop
     if [[ -f "$pidfile" ]]; then
@@ -75,7 +75,7 @@ breathing_effect() {
 }
 
 stop_breathing() {
-    local pidfile="/tmp/kbd-breath.pid"
+    local pidfile="${XDG_RUNTIME_DIR:-/tmp}/kbd-breath.pid"
     if [[ -f "$pidfile" ]]; then
         kill "$(cat "$pidfile")" 2>/dev/null || true
         rm -f "$pidfile"
@@ -111,8 +111,9 @@ show_status() {
     echo "Current brightness: $(cat "$LED_BASE/brightness" 2>/dev/null || echo 'N/A')"
     echo "Max brightness: $(get_max_brightness)"
 
-    if [[ -f "/tmp/kbd-breath.pid" ]]; then
-        echo "Breathing effect: ACTIVE (PID: $(cat /tmp/kbd-breath.pid))"
+    local pidfile="${XDG_RUNTIME_DIR:-/tmp}/kbd-breath.pid"
+    if [[ -f "$pidfile" ]]; then
+        echo "Breathing effect: ACTIVE (PID: $(cat "$pidfile"))"
     else
         echo "Breathing effect: INACTIVE"
     fi

@@ -77,5 +77,5 @@ alias gpu-wake='nvidia-smi -q > /dev/null && echo "dGPU woken" && gpu-status'
 alias gpu-sleep='echo "dGPU will sleep automatically when not in use"'
 alias gpu-run='nvidia-offload'
 
-# Force dGPU off (requires root, use if stuck active)
-alias gpu-force-off='echo auto | sudo tee /sys/bus/pci/devices/0000:01:00.0/power/control && echo "Forced auto power management"'
+# Force dGPU off (udev rule allows video group to control)
+alias gpu-force-off='echo auto > /sys/bus/pci/devices/0000:01:00.0/power/control 2>/dev/null && echo "Forced auto power management" || echo "Failed - try: sudo nixos-rebuild switch"'

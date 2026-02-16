@@ -18,7 +18,9 @@
 WALLPAPER_DIR="$HOME/.local/share/wallpapers/nasa"
 CACHE_FILE="$WALLPAPER_DIR/.apod_cache"
 NASA_API="https://api.nasa.gov/planetary/apod"
-API_KEY="DEMO_KEY"  # Replace with your own key from https://api.nasa.gov/ for higher rate limits
+# NOTE: DEMO_KEY has low rate limits (30/hour). Get a free key at https://api.nasa.gov/
+# Store your key in ~/.config/nasa-apod-key or set NASA_API_KEY environment variable
+API_KEY="${NASA_API_KEY:-$(cat ~/.config/nasa-apod-key 2>/dev/null || echo "DEMO_KEY")}"
 LOOP_INTERVAL=600   # 10 minutes
 
 # Create wallpaper directory (owner-only permissions)

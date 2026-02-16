@@ -399,12 +399,8 @@ in
     }
   ];
 
-  # Additional sudoers for paths with special characters (:: not allowed in extraRules)
-  security.sudo.extraConfig = ''
-    ljsm ALL=(ALL) NOPASSWD: ${pkgs.coreutils}/bin/tee /sys/class/leds/system76_acpi\:\:kbd_backlight/brightness
-    ljsm ALL=(ALL) NOPASSWD: ${pkgs.coreutils}/bin/tee /sys/class/leds/system76_acpi\:\:kbd_backlight/color
-    ljsm ALL=(ALL) NOPASSWD: ${pkgs.coreutils}/bin/tee /sys/bus/pci/devices/0000\:01\:00.0/power/control
-  '';
+  # NOTE: Keyboard LED and GPU power control now handled via udev rules (see below)
+  # No passwordless sudo needed - udev sets MODE="0666" on these sysfs paths
 
   # Required for Sway
   security.pam.services.swaylock = {};
@@ -485,11 +481,15 @@ in
   services.avahi = {
     enable = true;
     nssmdns4 = true;       # Enable mDNS name resolution
-    openFirewall = true;   # Allow mDNS through firewall
+    openFirewall = false;  # Security: don't open firewall globally
+                           # mDNS works on trusted LANs; use allowedUDPPorts if needed
     publish = {
       enable = false;      # Don't advertise this machine
       userServices = false;
     };
+    # Only allow mDNS reflector on specific interfaces if needed:
+    # reflector = true;
+    # allowInterfaces = [ "eth0" ];
   };
 
   # SANE scanning support
@@ -541,33 +541,35 @@ in
     };
   };
 
-  # Polkit rules for passwordless mounting and formatting of removable media
+  # Polkit rules for passwordless mounting of REMOVABLE media only
+  # System mounts require password for security
   security.polkit.extraConfig = ''
     polkit.addRule(function(action, subject) {
-      if ((action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
-           action.id == "org.freedesktop.udisks2.filesystem-mount" ||
-           action.id == "org.freedesktop.udisks2.filesystem-mount-other-seat" ||
+      /* Only allow passwordless mount/unmount for removable media (USB, SD cards) */
+      if ((action.id == "org.freedesktop.udisks2.filesystem-mount" ||
            action.id == "org.freedesktop.udisks2.filesystem-unmount-others" ||
            action.id == "org.freedesktop.udisks2.eject-media" ||
            action.id == "org.freedesktop.udisks2.power-off-drive" ||
            action.id == "org.freedesktop.udisks2.encrypted-unlock" ||
-           action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
            action.id == "org.freedesktop.udisks2.loop-setup") &&
           subject.isInGroup("wheel") &&
-          subject.user == "ljsm") {
+          subject.local &&
+          subject.active) {
         return polkit.Result.YES;
       }
     });
 
-    /* Disk formatting requires auth (password prompt) for safety */
+    /* System mounts, other-seat mounts, and disk modification require password */
     polkit.addRule(function(action, subject) {
-      if ((action.id == "org.freedesktop.udisks2.modify-device" ||
+      if ((action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
+           action.id == "org.freedesktop.udisks2.filesystem-mount-other-seat" ||
+           action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
+           action.id == "org.freedesktop.udisks2.modify-device" ||
            action.id == "org.freedesktop.udisks2.modify-device-system" ||
            action.id == "org.freedesktop.udisks2.rescan" ||
            action.id == "org.freedesktop.udisks2.ata-smart-update" ||
            action.id == "org.freedesktop.udisks2.ata-smart-simulate") &&
-          subject.isInGroup("wheel") &&
-          subject.user == "ljsm") {
+          subject.isInGroup("wheel")) {
         return polkit.Result.AUTH_ADMIN_KEEP;
       }
     });
@@ -588,6 +590,9 @@ in
 
     # System76 keyboard backlight - allow video group to control
     SUBSYSTEM=="leds", KERNEL=="system76_acpi::kbd_backlight", RUN+="${pkgs.coreutils}/bin/chmod 666 /sys/class/leds/system76_acpi::kbd_backlight/brightness /sys/class/leds/system76_acpi::kbd_backlight/color"
+
+    # NVIDIA GPU runtime power management - allow video group
+    SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", RUN+="${pkgs.coreutils}/bin/chmod 664 /sys%p/power/control", GROUP="video"
   '';
 
   # PlatformIO udev rules for USB programmers (Arduino, ESP, STM32, etc.)
@@ -649,7 +654,9 @@ in
   users.users.ljsm = {
     isNormalUser = true;
     description = "ljsm";
-    extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "docker" "video" "input" "storage" "users" "render" "libvirtd" "kvm" "scanner" "lp" ];
+    # Groups: wheel=sudo, video=GPU/brightness, libvirtd/kvm=VMs, scanner/lp=printing
+    # Note: docker group removed - using rootless Docker instead
+    extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "video" "storage" "users" "render" "libvirtd" "kvm" "scanner" "lp" ];
     packages = with pkgs; [
       waynergy
       lan-mouse
@@ -977,15 +984,23 @@ in
     TerminalEmulator=foot
   '';
 
-  # Docker
-  virtualisation.docker.enable = true;
+  # Docker - rootless mode for security (no root daemon)
+  virtualisation.docker = {
+    enable = true;
+    rootless = {
+      enable = true;
+      setSocketVariable = true;  # Sets DOCKER_HOST for user
+    };
+    # Disable root daemon since we're using rootless
+    daemon.settings = { };
+  };
 
   # Libvirt / QEMU / KVM
   virtualisation.libvirtd = {
     enable = true;
     qemu = {
       package = pkgs.qemu_kvm;
-      runAsRoot = true;
+      runAsRoot = false;  # Security: run QEMU as user, not root
       swtpm.enable = true;
     };
   };
@@ -1353,10 +1368,13 @@ in
   };
 
   #####################################################################
-  # Firewall - SSH enabled
+  # Firewall
   #####################################################################
   networking.firewall = {
     enable = true;
+    # Port 24800: Barrier/Deskflow KVM sharing (keyboard/mouse across machines)
+    # WARNING: KVM traffic is unencrypted. Only use on trusted LANs.
+    # For remote use, tunnel through SSH: ssh -L 24800:localhost:24800 host
     allowedTCPPorts = [ 24800 ];
     allowedUDPPorts = [ 24800 ];
   };
