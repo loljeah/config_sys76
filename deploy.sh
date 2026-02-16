@@ -53,6 +53,7 @@ deploy  hyprlock.conf         ~/.config/hypr/hyprlock.conf
 deploy  config                ~/.config/hypr/config
 deploy  udiskie-config.yml    ~/.config/udiskie/config.yml
 deploy  lan-mouse.toml        ~/.config/lan-mouse/config.toml
+deploy  init.lua              ~/.config/nvim/init.lua
 
 # GTK theme settings (consistent look across apps)
 deploy  gtk-3.0-settings.ini  ~/.config/gtk-3.0/settings.ini
@@ -104,6 +105,10 @@ mkdir -p ~/Pictures/Screenshots
 mkdir -p ~/.local/share/wallpapers/nasa
 mkdir -p ~/3DPrinting
 mkdir -p ~/.local/share/waybar-todo
+mkdir -p ~/Documents
+mkdir -p ~/Videos
+mkdir -p ~/Music
+mkdir -p ~/Calibre\ Library
 
 # ──────────────────────────────────────────────────────────────────
 #  Shell config files

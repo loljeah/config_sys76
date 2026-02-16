@@ -1,0 +1,5 @@
+# Firejail globals.local - applies to all sandboxed applications
+# Deploy to: ~/.config/firejail/globals.local
+
+# Allow all firejailed apps to read/write from Downloads
+whitelist ~/Downloads

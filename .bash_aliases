@@ -15,7 +15,6 @@ alias du='du -h'
 # git create repo from foldername
 alias gitinit='git init && git remote add origin "git@github.com:loljeah/$(basename "$PWD").git"'
 alias gitpush='git add . && git commit && git push -u origin main'
-alias firefox='librewolf'
 
 # NASA Wallpaper aliases
 alias wallpaper='~/.local/bin/nasa-wallpaper'

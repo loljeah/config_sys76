@@ -96,6 +96,33 @@ button:hover {
     opacity: 0.6;
 }
 
+/* wlr/taskbar - shows icons per workspace */
+#taskbar {
+    padding: 0 4px;
+}
+
+#taskbar button {
+    padding: 0 4px;
+    margin: 2px 1px;
+    background-color: #2d1f3d;
+    border-radius: 3px;
+    border: none;
+}
+
+#taskbar button:hover {
+    background-color: rgba(255, 45, 226, 0.4);
+}
+
+#taskbar button.active {
+    background-color: #bd00ff;
+    box-shadow: inset 0 -2px #00ffff;
+}
+
+#taskbar button.minimized {
+    background-color: #1a0f26;
+    opacity: 0.5;
+}
+
 #clock,
 #cpu,
 #memory,

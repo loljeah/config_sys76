@@ -17,6 +17,8 @@ set $file_manager thunar
 set $screenshot_full grim ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png && notify-send "Screenshot saved"
 set $screenshot_region grim -g "$(slurp)" ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png && notify-send "Screenshot saved"
 set $screenshot_edit grim -g "$(slurp)" - | swappy -f -
+set $screenshot_clipboard grim -g "$(slurp)" - | wl-copy && notify-send "Screenshot copied to clipboard"
+set $screenshot_full_clipboard grim - | wl-copy && notify-send "Fullscreen copied to clipboard"
 
 #######################
 # Output (Monitors)
@@ -75,6 +77,14 @@ client.focused          #ff2de2 #bd00ff #e0e0e0 #00ffff   #ff2de2
 client.focused_inactive #6b2d6b #3d1a3d #c0c0c0 #6b2d6b   #6b2d6b
 client.unfocused        #2d1f3d #1a0f26 #808080 #2d1f3d   #2d1f3d
 client.urgent           #ff0055 #ff0055 #ffffff #ff0055   #ff0055
+
+#######################
+# GTK Dark Theme (for apps like pwvucontrol)
+#######################
+exec_always {
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+    gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
+}
 
 #######################
 #######################
@@ -159,16 +169,22 @@ bindsym $mod+Shift+w exec ~/.local/bin/nasa-wallpaper random
 #######################
 # Keybindings - Screenshots
 #######################
-# Full screen screenshot
+# Full screen screenshot (save to file)
 bindsym Print exec $screenshot_full
 
-# Region screenshot
+# Region screenshot (save to file)
 bindsym Shift+Print exec $screenshot_region
 
 # Region screenshot with edit (swappy)
 bindsym $mod+Print exec $screenshot_edit
 
-# Alternative: Ctrl+Shift+S for region (like flameshot)
+# Region to clipboard only (no file)
+bindsym Control+Print exec $screenshot_clipboard
+
+# Fullscreen to clipboard only
+bindsym Control+Shift+Print exec $screenshot_full_clipboard
+
+# Alternative: Ctrl+Shift+S for region edit (like flameshot)
 bindsym Control+Shift+s exec $screenshot_edit
 
 #######################

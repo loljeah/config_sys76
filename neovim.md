@@ -1,5 +1,32 @@
 # Neovim Cheatsheet
 
+## Quick Setup
+
+Config file: `~/.config/nvim/init.lua` (deployed via `deploy.sh`)
+
+### Key Features
+- **System clipboard**: Copy/paste works with Ctrl+C/Ctrl+V
+- **Mouse support**: Click to position cursor, scroll, select text
+- **Familiar shortcuts**: Ctrl+S save, Ctrl+Z undo, Ctrl+Q quit
+- **Line numbers**: Relative for quick jumping
+- **Dark theme**: Cyberpunk colors matching Sway theme
+
+### Essential Shortcuts (Custom)
+| Key | Action |
+|-----|--------|
+| `Ctrl+S` | Save file |
+| `Ctrl+Q` | Quit |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy (visual mode) |
+| `Ctrl+V` | Paste |
+| `Ctrl+A` | Select all |
+| `jk` or `jj` | Exit insert mode |
+| `Space+e` | File explorer |
+| `Alt+j/k` | Move line down/up |
+
+---
+
 ## Modes
 
 | Key | Mode | Description |

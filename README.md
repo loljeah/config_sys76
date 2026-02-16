@@ -77,12 +77,102 @@ Neon-noir aesthetic with:
 | `configuration.nix` | `/etc/nixos/configuration.nix` |
 | `sway-config` | `~/.config/sway/config` |
 | `waybar-config` | `~/.config/waybar/config` |
-| `waybar-style.css` | `~/.config/waybar/style.css` |
+| `style.css` | `~/.config/waybar/style.css` |
 | `foot.ini` | `~/.config/foot/foot.ini` |
 | `mako-config` | `~/.config/mako/config` |
 | `kanshi-config` | `~/.config/kanshi/config` |
 | `hyprlock.conf` | `~/.config/hypr/hyprlock.conf` |
+| `init.lua` | `~/.config/nvim/init.lua` |
+| `gtk-3.0-settings.ini` | `~/.config/gtk-3.0/settings.ini` |
+| `gtk-4.0-settings.ini` | `~/.config/gtk-4.0/settings.ini` |
 | `nasa-wallpaper` | `~/.local/bin/nasa-wallpaper` (chmod +x) |
+
+### Quick Deploy
+```bash
+./deploy.sh
+```
+
+---
+
+## Browser
+
+Using **Floorp** (Firefox-based) instead of LibreWolf for better performance:
+- Native vertical tabs and workspaces
+- Built-in privacy features
+- Comparable to Firefox performance
+- Hardware acceleration works with Intel iHD driver
+
+Launched via firejail for sandboxing.
+
+---
+
+## Neovim
+
+Config: `~/.config/nvim/init.lua`
+
+### Features
+- System clipboard integration (Ctrl+C/V work)
+- Mouse support
+- GUI-style shortcuts (Ctrl+S save, Ctrl+Z undo)
+- Cyberpunk dark theme matching Sway
+- Relative line numbers
+
+See `neovim.md` for full keybinding reference.
+
+---
+
+## GTK Theme
+
+Apps like pwvucontrol use GTK4. Dark theme is forced via:
+- `gtk-theme-name=Adwaita-dark` in GTK settings
+- `gsettings` commands in sway autostart
+- `gtk-application-prefer-dark-theme=1`
+
+---
+
+## Firejail Sandbox
+
+All high-risk applications run in firejail sandboxes with restricted permissions.
+
+### Sandboxed Applications
+
+| App | Network | Filesystem | Notes |
+|-----|---------|------------|-------|
+| **Floorp** | Yes | ~/Downloads, ~/Pictures | Browser, read-only gitZ |
+| **Thunderbird** | Yes | ~/Downloads | Email client |
+| **Signal** | Yes | Minimal | Encrypted messenger |
+| **LibreOffice** | No | ~/Documents, ~/Downloads | Office suite |
+| **VLC** | No | ~/Videos, ~/Music, /media | Media player |
+| **Handbrake** | No | ~/Videos, /media | Video converter |
+| **Audacity** | No | ~/Music | Audio editor |
+| **GIMP** | No | ~/Pictures | Image editor |
+| **imv** | No | Read-only | Image viewer |
+| **Zathura** | No | Read-only | PDF viewer |
+| **Calibre** | No | ~/Calibre Library | E-book manager |
+| **Orca-slicer** | No | ~/3DPrinting | 3D print slicer |
+| **qBittorrent** | Yes | ~/Downloads | Torrent client |
+
+### Common Sandbox Flags
+
+| Flag | Purpose |
+|------|---------|
+| `--caps.drop=all` | Drop all Linux capabilities |
+| `--nonewprivs` | Prevent privilege escalation |
+| `--noroot` | Block fakeroot/newuidmap |
+| `--seccomp` | System call filtering |
+| `--net=none` | No network access |
+| `--private-tmp` | Isolated /tmp |
+| `--whitelist=~/path` | Only allow specific directories |
+
+### Verify Sandbox
+
+```bash
+# Check if app is sandboxed
+firejail --list
+
+# Test sandbox restrictions
+firejail --debug firefox
+```
 
 ---
 

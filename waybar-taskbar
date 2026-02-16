@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# waybar-taskbar - Show only apps from the current workspace
+# Uses sway IPC to filter windows by workspace
+
+set -euo pipefail
+
+get_current_workspace() {
+    swaymsg -t get_workspaces | jq -r '.[] | select(.focused==true) | .name'
+}
+
+get_windows_on_workspace() {
+    local ws="$1"
+    # Get the tree and extract windows from the focused workspace
+    swaymsg -t get_tree | jq -r --arg ws "$ws" '
+        # Recursive function to find all windows
+        def find_windows:
+            if .type == "con" and .app_id != null then
+                [{
+                    app_id: .app_id,
+                    name: (.name // .app_id // "unknown"),
+                    focused: .focused,
+                    id: .id
+                }]
+            elif .type == "con" and .window != null then
+                [{
+                    app_id: (.window_properties.class // "unknown"),
+                    name: (.name // .window_properties.class // "unknown"),
+                    focused: .focused,
+                    id: .id
+                }]
+            elif .nodes then
+                [.nodes[] | find_windows] | flatten
+            elif .floating_nodes then
+                [.floating_nodes[] | find_windows] | flatten
+            else
+                []
+            end;
+
+        # Find the workspace node
+        def find_workspace($name):
+            if .type == "workspace" and .name == $name then
+                .
+            elif .nodes then
+                [.nodes[] | find_workspace($name)] | flatten | .[0] // empty
+            else
+                empty
+            end;
+
+        # Get windows from the workspace
+        find_workspace($ws) | find_windows | unique_by(.id)
+    '
+}
+
+format_taskbar() {
+    local windows="$1"
+
+    if [ -z "$windows" ] || [ "$windows" = "null" ] || [ "$windows" = "[]" ]; then
+        echo '{"text": "", "tooltip": "No windows", "class": "empty"}'
+        return
+    fi
+
+    local text=""
+    local tooltip=""
+    local count=0
+
+    while IFS= read -r window; do
+        local app_id name focused
+        app_id=$(echo "$window" | jq -r '.app_id // "unknown"')
+        name=$(echo "$window" | jq -r '.name // "unknown"')
+        focused=$(echo "$window" | jq -r '.focused')
+
+        # Truncate long names
+        if [ ${#name} -gt 20 ]; then
+            name="${name:0:17}..."
+        fi
+
+        # Format based on focus state
+        if [ "$focused" = "true" ]; then
+            text+="<span color='#bd00ff'>[${app_id}]</span> "
+        else
+            text+="[${app_id}] "
+        fi
+
+        tooltip+="${app_id}: ${name}\n"
+        ((count++)) || true
+    done < <(echo "$windows" | jq -c '.[]')
+
+    # Remove trailing space and newline
+    text="${text% }"
+    tooltip="${tooltip%\\n}"
+
+    # Output JSON for waybar
+    jq -n \
+        --arg text "$text" \
+        --arg tooltip "$tooltip" \
+        --arg class "has-windows" \
+        '{"text": $text, "tooltip": $tooltip, "class": $class}'
+}
+
+focus_window() {
+    local window_id="$1"
+    swaymsg "[con_id=${window_id}] focus"
+}
+
+close_window() {
+    local window_id="$1"
+    swaymsg "[con_id=${window_id}] kill"
+}
+
+case "${1:-status}" in
+    status)
+        ws=$(get_current_workspace)
+        windows=$(get_windows_on_workspace "$ws")
+        format_taskbar "$windows"
+        ;;
+    focus)
+        if [ -n "${2:-}" ]; then
+            focus_window "$2"
+        fi
+        ;;
+    close)
+        if [ -n "${2:-}" ]; then
+            close_window "$2"
+        fi
+        ;;
+    *)
+        echo '{"text": "?", "tooltip": "Unknown command", "class": "error"}'
+        ;;
+esac

@@ -59,6 +59,9 @@ in
     # Memory
     "transparent_hugepage=madvise"    # THP on-demand (better for mixed workloads)
 
+    # Power saving
+    "nmi_watchdog=0"                  # Disable NMI watchdog (saves power, loses crash debug)
+
     # Hibernate resume from swapfile
     "resume_offset=11255808"
 
@@ -223,34 +226,114 @@ in
   # Thermald for Intel CPU thermal management
   services.thermald.enable = true;
 
-  # TLP for laptop power management (conflicts with power-profiles-daemon)
+  # TLP for laptop power management
+  # Note: System76 power-daemon handles profiles (battery/balanced/performance)
+  # TLP handles the fine-grained settings that System76 doesn't cover
   services.tlp = {
     enable = true;
     settings = {
-      # CPU performance settings
+      # ─────────────────────────────────────────────────────────────
+      # CPU - Let System76 power-daemon handle governor via profiles
+      # These are fallbacks / additional tuning
+      # ─────────────────────────────────────────────────────────────
       CPU_SCALING_GOVERNOR_ON_AC = "performance";
       CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
       CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
       CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
 
-      # Intel CPU specific
+      # Intel HWP (Hardware P-states) - 14th gen i9
       CPU_HWP_DYN_BOOST_ON_AC = 1;
       CPU_HWP_DYN_BOOST_ON_BAT = 0;
 
-      # Disable turbo boost on battery for significant power savings
+      # Turbo boost - HUGE power saver when disabled on battery
       CPU_BOOST_ON_AC = 1;
       CPU_BOOST_ON_BAT = 0;
 
-      # PCIe power management
+      # CPU frequency limits on battery (i9-14900HX: 2.2GHz base, 5.8GHz turbo)
+      # Limiting max freq on battery saves significant power
+      # CPU_SCALING_MAX_FREQ_ON_BAT = 2200000;  # Uncomment for aggressive saving
+
+      # Platform profile (modern Intel - power/balanced/performance)
+      PLATFORM_PROFILE_ON_AC = "performance";
+      PLATFORM_PROFILE_ON_BAT = "low-power";
+
+      # ─────────────────────────────────────────────────────────────
+      # Intel GPU (iGPU) frequency limits - saves power on battery
+      # ─────────────────────────────────────────────────────────────
+      INTEL_GPU_MIN_FREQ_ON_AC = 0;        # Driver default
+      INTEL_GPU_MIN_FREQ_ON_BAT = 0;       # Driver default (lowest)
+      INTEL_GPU_MAX_FREQ_ON_AC = 0;        # Driver default (max)
+      INTEL_GPU_MAX_FREQ_ON_BAT = 800;     # Limit to 800MHz on battery
+      INTEL_GPU_BOOST_FREQ_ON_AC = 0;      # Driver default
+      INTEL_GPU_BOOST_FREQ_ON_BAT = 800;   # Limit boost on battery
+
+      # ─────────────────────────────────────────────────────────────
+      # PCIe / ASPM (Active State Power Management)
+      # ─────────────────────────────────────────────────────────────
+      PCIE_ASPM_ON_AC = "default";
       PCIE_ASPM_ON_BAT = "powersupersave";
 
-      # WiFi power saving
+      # ─────────────────────────────────────────────────────────────
+      # Runtime Power Management (for devices like NVIDIA dGPU)
+      # ─────────────────────────────────────────────────────────────
+      RUNTIME_PM_ON_AC = "on";
+      RUNTIME_PM_ON_BAT = "auto";
+
+      # Exclude NVIDIA GPU from TLP's runtime PM (handled by nvidia.powerManagement)
+      # Get device ID with: lspci -nn | grep -i nvidia
+      # RUNTIME_PM_DENYLIST = "01:00.0";  # Uncomment if NVIDIA PM conflicts
+
+      # ─────────────────────────────────────────────────────────────
+      # Storage - NVMe/SSD power management
+      # ─────────────────────────────────────────────────────────────
+      # AHCI link power management
+      SATA_LINKPWR_ON_AC = "med_power_with_dipm";
+      SATA_LINKPWR_ON_BAT = "min_power";
+
+      # NVMe - APM levels (1=min power, 254=max performance)
+      DISK_APM_LEVEL_ON_AC = "254 254";
+      DISK_APM_LEVEL_ON_BAT = "128 128";
+
+      # I/O scheduler (mq-deadline good for NVMe)
+      DISK_IOSCHED = "mq-deadline mq-deadline";
+
+      # ─────────────────────────────────────────────────────────────
+      # USB autosuspend - suspends idle USB devices
+      # ─────────────────────────────────────────────────────────────
+      USB_AUTOSUSPEND = 1;
+      # Exclude input devices (mouse, keyboard) from autosuspend
+      USB_DENYLIST = "usbhid";
+      # Or exclude specific devices by ID: USB_DENYLIST = "1234:5678 abcd:efgh"
+
+      # ─────────────────────────────────────────────────────────────
+      # WiFi power management
+      # ─────────────────────────────────────────────────────────────
       WIFI_PWR_ON_AC = "off";
       WIFI_PWR_ON_BAT = "on";
 
-      # Runtime PM for NVIDIA (handled by nvidia.powerManagement.finegrained)
-      RUNTIME_PM_ON_AC = "on";
-      RUNTIME_PM_ON_BAT = "auto";
+      # ─────────────────────────────────────────────────────────────
+      # Audio power save - powers down codec after idle
+      # ─────────────────────────────────────────────────────────────
+      SOUND_POWER_SAVE_ON_AC = 0;
+      SOUND_POWER_SAVE_ON_BAT = 1;
+      SOUND_POWER_SAVE_CONTROLLER = "Y";  # Also suspend controller
+
+      # ─────────────────────────────────────────────────────────────
+      # Misc power saving
+      # ─────────────────────────────────────────────────────────────
+      # NMI watchdog - disable for power saving (loses crash debugging)
+      NMI_WATCHDOG = 0;
+
+      # Wake-on-LAN - disable to save power
+      WOL_DISABLE = "Y";
+
+      # ─────────────────────────────────────────────────────────────
+      # Battery charge thresholds (if supported by System76)
+      # Limiting charge to 80% extends battery lifespan significantly
+      # Check support: tlp-stat -b
+      # ─────────────────────────────────────────────────────────────
+      # START_CHARGE_THRESH_BAT0 = 75;
+      # STOP_CHARGE_THRESH_BAT0 = 80;
     };
   };
 
@@ -360,8 +443,73 @@ in
     # rules will be in /var/lib/usbguard/rules.conf after generation
   };
 
-  # Printing
-  services.printing.enable = true;
+  #####################################################################
+  # PRINTING & SCANNING
+  #####################################################################
+
+  # CUPS printing
+  services.printing = {
+    enable = true;
+    # Network printer discovery
+    browsing = true;
+    defaultShared = false;  # Don't share printers from this machine
+
+    # Printer drivers
+    drivers = with pkgs; [
+      # Generic drivers (work with most PostScript/PCL printers)
+      cups-filters        # IPP Everywhere / driverless + generic PS/PCL
+      ghostscript         # PostScript interpreter
+
+      # Foomatic database (large driver collection)
+      foomatic-db
+      foomatic-db-ppds
+      foomatic-db-nonfree
+
+      # Gutenprint (wide coverage)
+      gutenprint
+      gutenprintBin
+
+      # Manufacturer-specific
+      hplip               # HP
+      brlaser             # Brother laser
+      brgenml1lpr         # Brother generic
+      brgenml1cupswrapper
+      epson-escpr         # Epson
+      epson-escpr2
+      splix               # Samsung/Xerox
+      cnijfilter2         # Canon
+    ];
+  };
+
+  # Avahi for network printer/scanner discovery (mDNS/Bonjour)
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;       # Enable mDNS name resolution
+    openFirewall = true;   # Allow mDNS through firewall
+    publish = {
+      enable = false;      # Don't advertise this machine
+      userServices = false;
+    };
+  };
+
+  # SANE scanning support
+  hardware.sane = {
+    enable = true;
+    extraBackends = with pkgs; [
+      sane-airscan         # Driverless scanning (AirScan/eSCL/WSD)
+      hplipWithPlugin      # HP scanner support
+      epkowa               # Epson scanners
+    ];
+    brscan4 = {
+      enable = true;       # Brother scanner driver (brscan4)
+      netDevices = {
+        mfc9320cw = {
+          model = "MFC-9320CW";
+          ip = "192.168.1.100";  # UPDATE: Set your printer's IP address
+        };
+      };
+    };
+  };
 
   # PipeWire audio
   services.pulseaudio.enable = false;
@@ -501,7 +649,7 @@ in
   users.users.ljsm = {
     isNormalUser = true;
     description = "ljsm";
-    extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "docker" "video" "input" "storage" "users" "render" "libvirtd" "kvm" ];
+    extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "docker" "video" "input" "storage" "users" "render" "libvirtd" "kvm" "scanner" "lp" ];
     packages = with pkgs; [
       waynergy
       lan-mouse
@@ -520,6 +668,9 @@ in
 
       # AI-CODE
       claude-code
+
+      # Sync / Cloud
+      nextcloud-client
 
       # Office / Productivity
       libreoffice
@@ -583,6 +734,10 @@ in
 
       # iOS
       libimobiledevice
+
+      # Printing & Scanning GUI tools
+      system-config-printer  # GTK printer setup (Wayland-compatible)
+      simple-scan            # Easy scanner GUI (GNOME Simple Scan)
 
       # Misc
       calc
@@ -916,6 +1071,33 @@ in
 
     # SSH key management
     keychain                 # Persistent SSH agent across sessions
+
+    # Common Linux tools
+    file                     # File type identification
+    tree                     # Directory tree view
+    ncdu                     # Disk usage analyzer (ncurses)
+    bind                     # DNS utilities (dig, nslookup)
+    traceroute               # Network path tracing
+    mtr                      # Better traceroute with stats
+    strace                   # Syscall tracer
+    ltrace                   # Library call tracer
+    dmidecode                # BIOS/hardware info
+    hdparm                   # Disk parameters
+    smartmontools            # SMART disk monitoring
+    inetutils                # telnet, ftp, hostname, etc.
+    ethtool                  # Ethernet settings
+    iftop                    # Network bandwidth monitor
+    hwinfo                   # Detailed hardware info
+    lm_sensors               # Hardware sensors (temp, fan)
+    acpi                     # Battery/power info
+    psmisc                   # killall, fuser, pstree
+    procps                   # ps, top, vmstat, free
+    iproute2                 # ip, ss commands
+    iputils                  # ping, arping
+    parted                   # Partition editor
+    bc                       # Calculator
+    man-pages                # Linux man pages
+    man-pages-posix          # POSIX man pages
   ];
 
   #####################################################################
@@ -926,27 +1108,219 @@ in
     wrappedBinaries = {
 
 
-      librewolf = {
-        executable = "${pkgs.librewolf}/bin/librewolf";
-        profile = "${pkgs.firejail}/etc/firejail/librewolf.profile";
-        desktop = "${pkgs.librewolf}/share/applications/librewolf.desktop";
+      # ─────────────────────────────────────────────────────────────
+      # BROWSERS - High risk, network-exposed, handles untrusted content
+      # ─────────────────────────────────────────────────────────────
+      firefox = {
+        executable = "${pkgs.firefox}/bin/firefox";
+        profile = "${pkgs.firejail}/etc/firejail/firefox.profile";
+        desktop = "${pkgs.firefox}/share/applications/firefox.desktop";
         extraArgs = [
-          "--env=GTK_THEME=Adwaita:dark"
+          # Environment
+          "--env=GTK_THEME=Adwaita-dark"
           "--env=MOZ_ENABLE_WAYLAND=1"
           "--env=MOZ_DISABLE_RDD_SANDBOX=1"
           "--env=LIBVA_DRIVER_NAME=iHD"
+          # DRM/Widevine support
+          "--env=MOZ_GMP_PATH=${pkgs.firefox}/lib/firefox/gmp-widevinecdm"
+          # D-Bus (minimal)
           "--dbus-user.talk=org.freedesktop.Notifications"
-          "--whitelist=~/gitZ"
+          "--dbus-user.talk=org.freedesktop.portal.Desktop"
+          "--dbus-user.talk=org.freedesktop.portal.FileChooser"
+          # Filesystem (restricted)
           "--whitelist=~/Downloads"
+          "--whitelist=~/Pictures"
+          "--read-only=~/gitZ"
+          # Security hardening
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--seccomp"
+          "--private-tmp"
         ];
       };
 
+      # ─────────────────────────────────────────────────────────────
+      # EMAIL - Network-exposed, handles attachments
+      # ─────────────────────────────────────────────────────────────
+      thunderbird = {
+        executable = "${pkgs.thunderbird}/bin/thunderbird";
+        profile = "${pkgs.firejail}/etc/firejail/thunderbird.profile";
+        desktop = "${pkgs.thunderbird}/share/applications/thunderbird.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--env=MOZ_ENABLE_WAYLAND=1"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.Desktop"
+          "--whitelist=~/Downloads"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--seccomp"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # MESSAGING - Network-exposed
+      # ─────────────────────────────────────────────────────────────
+      signal-desktop = {
+        executable = "${pkgs.signal-desktop}/bin/signal-desktop";
+        profile = "${pkgs.firejail}/etc/firejail/signal-desktop.profile";
+        desktop = "${signal-desktop-desktopitem}/share/applications/signal-desktop.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # OFFICE - Handles untrusted documents (macros, exploits)
+      # ─────────────────────────────────────────────────────────────
+      libreoffice = {
+        executable = "${pkgs.libreoffice}/bin/soffice";
+        profile = "${pkgs.firejail}/etc/firejail/libreoffice.profile";
+        desktop = "${pkgs.libreoffice}/share/applications/startcenter.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--whitelist=~/Documents"
+          "--whitelist=~/Downloads"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--seccomp"
+          "--private-tmp"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # MEDIA - Handles untrusted files
+      # ─────────────────────────────────────────────────────────────
+      vlc = {
+        executable = "${pkgs.vlc}/bin/vlc";
+        profile = "${pkgs.firejail}/etc/firejail/vlc.profile";
+        desktop = "${pkgs.vlc}/share/applications/vlc.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Videos"
+          "--whitelist=~/Music"
+          "--whitelist=~/Downloads"
+          "--whitelist=/media"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--seccomp"
+          "--net=none"
+        ];
+      };
+
+      handbrake = {
+        executable = "${pkgs.handbrake}/bin/ghb";
+        profile = "${pkgs.firejail}/etc/firejail/handbrake.profile";
+        desktop = "${pkgs.handbrake}/share/applications/fr.handbrake.ghb.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Videos"
+          "--whitelist=~/Downloads"
+          "--whitelist=/media"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+        ];
+      };
+
+      audacity = {
+        executable = "${pkgs.audacity}/bin/audacity";
+        profile = "${pkgs.firejail}/etc/firejail/audacity.profile";
+        desktop = "${pkgs.audacity}/share/applications/audacity.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Music"
+          "--whitelist=~/Downloads"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # GRAPHICS - Handles untrusted images
+      # ─────────────────────────────────────────────────────────────
+      gimp = {
+        executable = "${pkgs.gimp}/bin/gimp";
+        profile = "${pkgs.firejail}/etc/firejail/gimp.profile";
+        desktop = "${pkgs.gimp}/share/applications/gimp.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Pictures"
+          "--whitelist=~/Downloads"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+        ];
+      };
+
+      imv = {
+        executable = "${pkgs.imv}/bin/imv";
+        profile = "${pkgs.firejail}/etc/firejail/imv.profile";
+        extraArgs = [
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+          "--seccomp"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # DOCUMENTS - Handles untrusted PDFs/ebooks
+      # ─────────────────────────────────────────────────────────────
+      zathura = {
+        executable = "${pkgs.zathura}/bin/zathura";
+        profile = "${pkgs.firejail}/etc/firejail/zathura.profile";
+        extraArgs = [
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+          "--seccomp"
+          "--private-tmp"
+        ];
+      };
+
+      calibre = {
+        executable = "${pkgs.calibre}/bin/calibre";
+        profile = "${pkgs.firejail}/etc/firejail/calibre.profile";
+        desktop = "${pkgs.calibre}/share/applications/calibre-gui.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Documents"
+          "--whitelist=~/Downloads"
+          "--whitelist=~/Calibre Library"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--net=none"
+        ];
+      };
+
+      # ─────────────────────────────────────────────────────────────
+      # 3D PRINTING - Offline tool
+      # ─────────────────────────────────────────────────────────────
       orca-slicer = {
         executable = "${pkgs.orca-slicer}/bin/orca-slicer";
         profile = "${pkgs.firejail}/etc/firejail/default.profile";
         desktop = "${pkgs.orca-slicer}/share/applications/OrcaSlicer.desktop";
         extraArgs = [
-          "--env=GTK_THEME=Adwaita:dark"
+          "--env=GTK_THEME=Adwaita-dark"
           "--noprofile"
           "--caps.drop=all"
           "--nonewprivs"
@@ -956,38 +1330,24 @@ in
           "--whitelist=~/3DPrinting"
           "--whitelist=~/.config/OrcaSlicer"
           "--whitelist=~/.local/share/OrcaSlicer"
+          "--seccomp"
         ];
       };
 
-      signal-desktop = {
-        executable = "${pkgs.signal-desktop}/bin/signal-desktop";
-        profile = "${pkgs.firejail}/etc/firejail/signal-desktop.profile";
-        desktop = "${signal-desktop-desktopitem}/share/applications/signal-desktop.desktop";
-        extraArgs = [
-          "--env=GTK_THEME=Adwaita:dark"
-          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"
-          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
-          "--dbus-user.talk=org.freedesktop.Notifications"
-        ];
-      };
-
-      thunderbird = {
-        executable = "${pkgs.thunderbird}/bin/thunderbird";
-        profile = "${pkgs.firejail}/etc/firejail/thunderbird.profile";
-        desktop = "${pkgs.thunderbird}/share/applications/thunderbird.desktop";
-        extraArgs = [
-          "--env=GTK_THEME=Adwaita:dark"
-          "--env=MOZ_ENABLE_WAYLAND=1"
-          "--dbus-user.talk=org.freedesktop.Notifications"
-          "--dbus-user.talk=org.freedesktop.portal.Desktop"
-          "--whitelist=~/Downloads"
-        ];
-      };
-
+      # ─────────────────────────────────────────────────────────────
+      # TORRENTS - Network-exposed
+      # ─────────────────────────────────────────────────────────────
       qbittorrent = {
         executable = "${pkgs.qbittorrent-enhanced}/bin/qbittorrent";
         profile = "${pkgs.firejail}/etc/firejail/qbittorrent.profile";
         desktop = "${pkgs.qbittorrent-enhanced}/share/applications/org.qbittorrent.qBittorrent.desktop";
+        extraArgs = [
+          "--env=GTK_THEME=Adwaita-dark"
+          "--whitelist=~/Downloads"
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+        ];
       };
     };
   };

@@ -35,18 +35,16 @@
     },
 
     "wlr/taskbar": {
-        "format": "{icon} {name}",
-        "icon-size": 20,
+        "format": "{icon}",
+        "icon-size": 18,
         "icon-theme": "Adwaita",
-        "tooltip-format": "{app_id}: {title}",
+        "tooltip-format": "{title}",
         "on-click": "activate",
         "on-click-middle": "close",
         "on-click-right": "minimize",
         "ignore-list": [],
-        "app_ids-mapping": {},
-        "rewrite": {},
         "all-outputs": false,
-        "markup": true
+        "active-first": true
     },
 
     "idle_inhibitor": {
