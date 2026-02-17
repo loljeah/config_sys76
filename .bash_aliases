@@ -26,6 +26,9 @@ alias wallpaper-count='~/.local/bin/nasa-wallpaper count'
 # Reload sway & kanshi
 alias wreload='swaymsg reload && pkill -HUP kanshi 2>/dev/null'
 
+# Work desk display profile (Eizo left, laptop center, Samsung right)
+alias workdesk='kanshictl switch workdesk && echo "📺 Workdesk profile: Eizo(portrait) | Laptop | Samsung(portrait)"'
+
 #microtik serial
 alias microtik='minicom -D /dev/ttyUSB0 -b 115200'
 

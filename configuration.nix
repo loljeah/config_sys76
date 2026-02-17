@@ -703,6 +703,9 @@ in
       remmina
       magic-wormhole
 
+      # Matrix Chat
+      fractal          # GTK4/Rust Matrix client with E2EE (uses secure vodozemac)
+
       # Gaming / Emulation
  #     lutris
  #     wine
@@ -1130,29 +1133,6 @@ in
         executable = "${pkgs.firefox}/bin/firefox";
         profile = "${pkgs.firejail}/etc/firejail/firefox.profile";
         desktop = "${pkgs.firefox}/share/applications/firefox.desktop";
-        extraArgs = [
-          # Environment
-          "--env=GTK_THEME=Adwaita-dark"
-          "--env=MOZ_ENABLE_WAYLAND=1"
-          "--env=MOZ_DISABLE_RDD_SANDBOX=1"
-          "--env=LIBVA_DRIVER_NAME=iHD"
-          # DRM/Widevine support
-          "--env=MOZ_GMP_PATH=${pkgs.firefox}/lib/firefox/gmp-widevinecdm"
-          # D-Bus (minimal)
-          "--dbus-user.talk=org.freedesktop.Notifications"
-          "--dbus-user.talk=org.freedesktop.portal.Desktop"
-          "--dbus-user.talk=org.freedesktop.portal.FileChooser"
-          # Filesystem (restricted)
-          "--whitelist=~/Downloads"
-          "--whitelist=~/Pictures"
-          "--read-only=~/gitZ"
-          # Security hardening
-          "--caps.drop=all"
-          "--nonewprivs"
-          "--noroot"
-          "--seccomp"
-          "--private-tmp"
-        ];
       };
 
       # ─────────────────────────────────────────────────────────────
@@ -1190,6 +1170,34 @@ in
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
+        ];
+      };
+
+      fractal = {
+        executable = "${pkgs.fractal}/bin/fractal";
+        profile = "${pkgs.firejail}/etc/firejail/fractal.profile";
+        desktop = "${pkgs.fractal}/share/applications/org.gnome.Fractal.desktop";
+        extraArgs = [
+          # Environment
+          "--env=GTK_THEME=Adwaita-dark"
+          # D-Bus (notifications, portals, secrets for E2EE keys)
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.Desktop"
+          "--dbus-user.talk=org.freedesktop.portal.FileChooser"
+          "--dbus-user.talk=org.freedesktop.secrets"
+          "--dbus-user.talk=org.gnome.keyring"
+          # Filesystem (E2EE keys stored in config)
+          "--whitelist=~/.config/fractal"
+          "--whitelist=~/.local/share/fractal"
+          "--whitelist=~/.cache/fractal"
+          "--whitelist=~/Downloads"
+          "--whitelist=~/Pictures"
+          # Security hardening
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+          "--seccomp"
+          "--private-tmp"
         ];
       };
 
