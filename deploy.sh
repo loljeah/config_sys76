@@ -48,11 +48,9 @@ deploy  waybar-config         ~/.config/waybar/config
 deploy  style.css             ~/.config/waybar/style.css
 deploy  foot.ini              ~/.config/foot/foot.ini
 deploy  mako-config           ~/.config/mako/config
-deploy  kanshi-config         ~/.config/kanshi/config
 deploy  hyprlock.conf         ~/.config/hypr/hyprlock.conf
 deploy  config                ~/.config/hypr/config
 deploy  udiskie-config.yml    ~/.config/udiskie/config.yml
-deploy  lan-mouse.toml        ~/.config/lan-mouse/config.toml
 deploy  init.lua              ~/.config/nvim/init.lua
 
 # GTK theme settings (consistent look across apps)
@@ -63,20 +61,9 @@ deploy  gtk-4.0-settings.ini  ~/.config/gtk-4.0/settings.ini
 deploy  sway-portals.conf     ~/.config/xdg-desktop-portal/sway-portals.conf
 
 # ──────────────────────────────────────────────────────────────────
-#  Hyprlock shaders  →  ~/.config/hypr/shaders/
-# ──────────────────────────────────────────────────────────────────
-printf "\n── Hyprlock shaders ───────────────────────────────────────\n"
-
-deploy  starfield.frag        ~/.config/hypr/shaders/starfield.frag
-deploy  matrix.frag           ~/.config/hypr/shaders/matrix.frag
-
-# ──────────────────────────────────────────────────────────────────
 #  Executable scripts
 # ──────────────────────────────────────────────────────────────────
 printf "\n── Executables ────────────────────────────────────────────\n"
-
-deploy  nasa-wallpaper        ~/.local/bin/nasa-wallpaper
-chmod +x ~/.local/bin/nasa-wallpaper 2>/dev/null && ok "chmod +x  ~/.local/bin/nasa-wallpaper"
 
 deploy  netinfo               ~/.local/bin/netinfo
 chmod +x ~/.local/bin/netinfo 2>/dev/null && ok "chmod +x  ~/.local/bin/netinfo"
@@ -84,25 +71,10 @@ chmod +x ~/.local/bin/netinfo 2>/dev/null && ok "chmod +x  ~/.local/bin/netinfo"
 deploy  waybar-todo          ~/.local/bin/waybar-todo
 chmod +x ~/.local/bin/waybar-todo 2>/dev/null && ok "chmod +x  ~/.local/bin/waybar-todo"
 
-deploy  keyboard-led-control ~/.local/bin/keyboard-led-control
-chmod +x ~/.local/bin/keyboard-led-control 2>/dev/null && ok "chmod +x  ~/.local/bin/keyboard-led-control"
-
-deploy  ssh-keygen-helper ~/.local/bin/ssh-keygen-helper
-chmod +x ~/.local/bin/ssh-keygen-helper 2>/dev/null && ok "chmod +x  ~/.local/bin/ssh-keygen-helper"
-
-deploy  gen_matrix_bg.py      ~/.local/bin/gen_matrix_bg.py
-chmod +x ~/.local/bin/gen_matrix_bg.py 2>/dev/null && ok "chmod +x  ~/.local/bin/gen_matrix_bg.py"
-
-deploy  shell.nix             ~/.config/hypr/shell.nix
-
-# pre-generate first matrix frame so hyprlock has something on first lock
-nix-shell ~/.config/hypr/shell.nix --run "python3 ~/.local/bin/gen_matrix_bg.py" > /dev/null 2>&1 && ok "pre-generated ~/.cache/hyprlock/matrix.png" || warn "matrix pre-gen failed (check shell.nix)"
-
 # ──────────────────────────────────────────────────────────────────
 #  Standard directories
 # ──────────────────────────────────────────────────────────────────
 mkdir -p ~/Pictures/Screenshots
-mkdir -p ~/.local/share/wallpapers/nasa
 mkdir -p ~/3DPrinting
 mkdir -p ~/.local/share/waybar-todo
 mkdir -p ~/Documents
@@ -121,19 +93,6 @@ deploy  .bash_aliases         ~/.bash_aliases
 
 # Restrict shell configs to owner only (prevent info disclosure)
 chmod 600 ~/.bashrc ~/.bash_profile ~/.bash_aliases 2>/dev/null && ok "chmod 600  shell configs"
-
-# ──────────────────────────────────────────────────────────────────
-#  SSH config template (manual — security sensitive)
-# ──────────────────────────────────────────────────────────────────
-printf "\n── SSH config (manual) ────────────────────────────────────\n"
-
-if [[ -f ssh-config-template ]]; then
-    warn "SSH config is manual for security:"
-    warn "    mkdir -p ~/.ssh && chmod 700 ~/.ssh"
-    warn "    cp ssh-config-template ~/.ssh/config"
-    warn "    chmod 600 ~/.ssh/config"
-    warn "    # Edit ~/.ssh/config to add your hosts"
-fi
 
 # ──────────────────────────────────────────────────────────────────
 #  NixOS system config  (needs sudo — manual step)
@@ -155,12 +114,6 @@ if swaymsg reload 2>/dev/null; then
     ok "swaymsg reload"
 else
     warn "swaymsg reload failed (sway not running?)"
-fi
-
-if pkill -HUP kanshi 2>/dev/null; then
-    ok "kanshi reloaded"
-else
-    warn "kanshi reload failed (not running?)"
 fi
 
 # ──────────────────────────────────────────────────────────────────

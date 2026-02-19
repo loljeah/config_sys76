@@ -1,5 +1,16 @@
 # Firejail globals.local - applies to all sandboxed applications
 # Deploy to: ~/.config/firejail/globals.local
 
-# Allow all firejailed apps to read/write from Downloads
-whitelist ~/Downloads
+# Note: Per-app whitelists are preferred over globals for better isolation.
+# These globals provide minimal shared access; add app-specific overrides
+# in ~/.config/firejail/<appname>.local for apps that need Downloads/Pictures.
+
+# Font access for proper rendering (read-only by default in firejail)
+whitelist ~/.local/share/fonts
+whitelist ~/.fonts
+
+# Deny common sensitive locations explicitly
+blacklist ~/.ssh
+blacklist ~/.gnupg
+blacklist ~/.config/git/credentials
+blacklist ~/.netrc

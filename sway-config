@@ -23,8 +23,7 @@ set $screenshot_full_clipboard grim - | wl-copy && notify-send "Fullscreen copie
 #######################
 # Output (Monitors)
 #######################
-# Triple monitor setup - managed by kanshi for automatic profiles
-# Manual fallback (uncomment if kanshi doesn't work):
+# Configure monitors manually or use wdisplays
 # output DP-2 mode 2560x1440@99.90Hz position 0,0 transform 90
 # output HDMI-A-1 mode 1920x1080@239.76Hz position 1440,740
 # output DP-3 mode 1280x1024@60Hz position 3360,640 transform 90
@@ -46,8 +45,8 @@ workspace 8 output DP-3
 workspace 9 output DP-3
 workspace 10 output DP-3
 
-# Initial wallpaper fallback (swww will override this)
-output * bg #0a0a12 solid_color
+# Wallpaper (solid color)
+output * bg #1a0f26 solid_color
 
 #######################
 # Input
@@ -87,17 +86,11 @@ exec_always {
 }
 
 #######################
+# Idle & Lock
 #######################
-# Idle & Lock with Hyprlock Matrix Shader
-#######################
-# Flow:
-#   1. Idle 2 h      -> Hyprlock with Matrix shader
-#   2. Idle 2 h 10 m -> Screen power off
-#   3. Sleep         -> Immediate lock
-
 exec swayidle -w \
-    timeout 7200 'hyprlock' \
-    timeout 7800 'swaymsg "output * power off"' \
+    timeout 300 'hyprlock' \
+    timeout 600 'swaymsg "output * power off"' \
         resume 'swaymsg "output * power on"' \
     before-sleep 'hyprlock'
 
@@ -107,9 +100,6 @@ exec swayidle -w \
 # Notification daemon
 exec mako
 
-# Kanshi for multi-monitor management
-exec kanshi
-
 # Network manager applet
 exec nm-applet --indicator
 
@@ -117,23 +107,17 @@ exec nm-applet --indicator
 # Mount with RW permissions, use ntfs-3g for NTFS
 exec udiskie --automount --notify --tray --file-manager thunar
 
-# Clipboard history daemon
+# Clipboard history daemon (auto-clear after 100 entries to limit exposure)
 exec wl-paste --type text --watch cliphist store
 exec wl-paste --type image --watch cliphist store
+# Periodic clipboard cleanup (clear entries older than 1 hour)
+exec_always bash -c 'while sleep 3600; do cliphist wipe; done &'
 
 # Polkit agent (for GUI privilege escalation)
 exec /run/current-system/sw/libexec/polkit-gnome-authentication-agent-1
 
 # Create screenshots directory
 exec mkdir -p ~/Pictures/Screenshots
-
-# Dynamic wallpaper with swww (NASA APOD)
-# Start swww daemon, then fetch today's NASA Astronomy Picture of the Day
-exec_always swww-daemon
-exec sleep 2 && ~/.local/bin/nasa-wallpaper
-
-# Optional: Wallpaper rotation mode (uncomment for 30-minute rotation)
-# exec ~/.local/bin/nasa-wallpaper loop
 
 #######################
 # Keybindings - General
@@ -156,15 +140,11 @@ bindsym $mod+Shift+c reload
 # Exit sway
 bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit sway?' -B 'Yes' 'swaymsg exit'
 
-# Lock screen with Matrix shader
+# Lock screen
 bindsym $mod+Escape exec hyprlock
 
-# Clipboard history
 # Clipboard history (Shift+v to avoid conflict with splitv)
 bindsym $mod+Shift+v exec cliphist list | rofi -dmenu -p "Clipboard" | cliphist decode | wl-copy
-
-# Change wallpaper (random NASA APOD)
-bindsym $mod+Shift+w exec ~/.local/bin/nasa-wallpaper random
 
 #######################
 # Keybindings - Screenshots

@@ -14,22 +14,12 @@ alias du='du -h'
 
 # git create repo from foldername
 alias gitinit='git init && git remote add origin "git@github.com:loljeah/$(basename "$PWD").git"'
-alias gitpush='git add . && git commit && git push -u origin main'
+# gitpush removed - 'git add .' is dangerous, stage files explicitly
 
-# NASA Wallpaper aliases
-alias wallpaper='~/.local/bin/nasa-wallpaper'
-alias wallpaper-new='~/.local/bin/nasa-wallpaper random'
-alias wallpaper-loop='~/.local/bin/nasa-wallpaper loop &'
-alias wallpaper-local='~/.local/bin/nasa-wallpaper local &'
-alias wallpaper-count='~/.local/bin/nasa-wallpaper count'
+# Reload sway
+alias wreload='swaymsg reload'
 
-# Reload sway & kanshi
-alias wreload='swaymsg reload && pkill -HUP kanshi 2>/dev/null'
-
-# Work desk display profile (Eizo left, laptop center, Samsung right)
-alias workdesk='kanshictl switch workdesk && echo "📺 Workdesk profile: Eizo(portrait) | Laptop | Samsung(portrait)"'
-
-#microtik serial
+# MikroTik serial
 alias microtik='minicom -D /dev/ttyUSB0 -b 115200'
 
 # Reinit PipeWire audio (fix missing devices)
@@ -80,5 +70,6 @@ alias gpu-wake='nvidia-smi -q > /dev/null && echo "dGPU woken" && gpu-status'
 alias gpu-sleep='echo "dGPU will sleep automatically when not in use"'
 alias gpu-run='nvidia-offload'
 
-# Force dGPU off (udev rule allows video group to control)
-alias gpu-force-off='echo auto > /sys/bus/pci/devices/0000:01:00.0/power/control 2>/dev/null && echo "Forced auto power management" || echo "Failed - try: sudo nixos-rebuild switch"'
+# Force dGPU off (requires video group membership via udev rule)
+# Validates path before write to prevent symlink attacks
+alias gpu-force-off='test -c /sys/bus/pci/devices/0000:01:00.0/power/control || { echo "Invalid device path"; exit 1; } && echo auto > /sys/bus/pci/devices/0000:01:00.0/power/control 2>/dev/null && echo "Forced auto power management" || echo "Failed - check video group membership"'

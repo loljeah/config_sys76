@@ -155,7 +155,7 @@ in
     LD_PRELOAD = "";
   };
 
- 
+
   #####################################################################
   # BOOTLOADER & KERNEL
   #####################################################################
@@ -192,7 +192,58 @@ in
     options v4l2loopback devices=1 video_nr=1 card_label="OBS Cam" exclusive_caps=1
   '';
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  #####################################################################
+  # NIX STORE & BINARY CACHE HARDENING
+  #####################################################################
+  nix.settings = {
+    # Enable modern Nix features
+    experimental-features = [ "nix-command" "flakes" ];
+
+    # ─── Signature Verification (MITM Protection) ───────────────────
+    # Require cryptographic signatures on all substituted paths
+    require-sigs = true;
+
+    # Only trust official NixOS cache signing key
+    # Add additional keys here if using extra caches (e.g., cachix)
+    trusted-public-keys = [
+      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    ];
+
+    # ─── Substituter Restrictions ────────────────────────────────────
+    # Only use official HTTPS cache (encrypted transport)
+    substituters = [ "https://cache.nixos.org" ];
+
+    # No additional caches allowed by unprivileged users
+    trusted-substituters = [ ];
+
+    # ─── User Access Control ─────────────────────────────────────────
+    # Restrict who can connect to nix-daemon
+    allowed-users = [ "@wheel" ];
+
+    # CRITICAL: trusted-users can bypass security checks
+    # Adding users here is equivalent to giving them root access
+    trusted-users = [ "root" ];
+
+    # ─── Build Sandbox (Defense in Depth) ────────────────────────────
+    # Isolate builds from host filesystem
+    sandbox = true;
+
+    # Fail if sandbox unavailable (don't silently disable)
+    sandbox-fallback = false;
+
+    # Block privilege escalation inside builds
+    allow-new-privileges = false;
+
+    # Filter dangerous syscalls in sandbox
+    filter-syscalls = true;
+
+    # ─── Additional Hardening ────────────────────────────────────────
+    # Restrict evaluation-time builds (breaks some packages if false)
+    # allow-import-from-derivation = false;  # Uncomment for stricter security
+
+    # Auto-optimize store to save disk space
+    auto-optimise-store = true;
+  };
 
   networking.hostName = "ax76";
   networking.networkmanager.enable = true;
@@ -364,26 +415,8 @@ in
     size = 32 * 1024;  # 32GB in MB - adjust to your RAM size
   }];
 
-  # Keyboard backlight breathing effect on lid open
-  services.acpid = {
-    enable = true;
-    lidEventCommands = ''
-      LID_STATE=$(cat /proc/acpi/button/lid/LID0/state 2>/dev/null | awk '{print $2}')
-      KBD_SCRIPT="/home/ljsm/.local/bin/keyboard-led-control"
-
-      if [[ "$LID_STATE" == "open" ]]; then
-        # Start breathing effect when lid opens
-        if [[ -x "$KBD_SCRIPT" ]]; then
-          su ljsm -c "$KBD_SCRIPT breath" &
-        fi
-      else
-        # Turn off when lid closes (save power)
-        if [[ -x "$KBD_SCRIPT" ]]; then
-          su ljsm -c "$KBD_SCRIPT off" &
-        fi
-      fi
-    '';
-  };
+  # ACPID for lid events (keyboard LED script removed)
+  services.acpid.enable = true;
 
   # Security
   security.polkit.enable = true;
@@ -658,8 +691,6 @@ in
     # Note: docker group removed - using rootless Docker instead
     extraGroups = [ "networkmanager" "wheel" "dialout" "plugdev" "video" "storage" "users" "render" "libvirtd" "kvm" "scanner" "lp" ];
     packages = with pkgs; [
-      waynergy
-      lan-mouse
       # Development / Editors
       helix              # Modern modal editor - native, fast, built-in LSP
       neovim             # Highly extensible, large ecosystem
@@ -767,7 +798,6 @@ in
       slurp
       swappy
       wdisplays
-      kanshi
       rofi
       mako
       foot
@@ -781,7 +811,6 @@ in
       pwvucontrol
       networkmanagerapplet
       swaybg
-      swww
       imv
       zathura
       file-roller
@@ -818,7 +847,6 @@ in
       swaylock
       swayidle
       swaybg
-      swww
       waybar
       wl-clipboard
       mako
@@ -826,7 +854,6 @@ in
       slurp
       foot
       rofi
-      kanshi
     ];
     extraSessionCommands = ''
       export SDL_VIDEODRIVER=wayland
@@ -945,17 +972,10 @@ in
       power-status = "system76-power profile";
       power-charge = "system76-power charge-thresholds";
 
-      # Keyboard backlight control aliases
-      kbd-breath = "~/.local/bin/keyboard-led-control breath";
-      kbd-on = "~/.local/bin/keyboard-led-control solid";
-      kbd-off = "~/.local/bin/keyboard-led-control off";
-      kbd-status = "~/.local/bin/keyboard-led-control status";
-
       # SSH key management aliases
       ssh-keys = "ssh-add -l";
       ssh-load = "ssh-add";
       ssh-unload = "ssh-add -D";
-      ssh-gen = "~/.local/bin/ssh-keygen-helper";
     };
   };
 
@@ -1009,7 +1029,42 @@ in
   };
   programs.virt-manager.enable = true;
 
-  # Allow unfree packages (required for NVIDIA drivers)
+  #####################################################################
+  # BROWSERS - Hardware acceleration + DRM (Widevine) configuration
+  #####################################################################
+
+  # Firefox - hardware video decode + DRM
+  programs.firefox = {
+    enable = true;
+    preferences = {
+      # Hardware video acceleration (VA-API)
+      "media.ffmpeg.vaapi.enabled" = true;
+      "media.hardware-video-decoding.force-enabled" = true;
+      "gfx.webrender.all" = true;
+      # DRM (Widevine) for Netflix, etc.
+      "media.eme.enabled" = true;
+      "media.gmp-widevinecdm.visible" = true;
+      "media.gmp-widevinecdm.enabled" = true;
+      # Wayland native
+      "widget.use-xdg-desktop-portal.file-picker" = 1;
+      "widget.use-xdg-desktop-portal.mime-handler" = 1;
+    };
+  };
+
+  # Chromium - hardware video decode + Widevine
+  programs.chromium = {
+    enable = true;
+    # Widevine DRM included in NixOS chromium package
+    enablePlasmaBrowserIntegration = false;
+    # Hardware acceleration and Wayland flags
+    extraOpts = {
+      # Hardware acceleration
+      "HardwareAccelerationModeEnabled" = true;
+    };
+    defaultSearchProviderEnabled = false;
+  };
+
+  # Allow unfree packages (required for NVIDIA drivers, Widevine)
   nixpkgs.config.allowUnfree = true;
 
   # System packages
@@ -1121,18 +1176,214 @@ in
   #####################################################################
   # FIREJAIL
   #####################################################################
+  #
+  # ═══════════════════════════════════════════════════════════════════
+  # FIREJAIL FLAGS REFERENCE
+  # ═══════════════════════════════════════════════════════════════════
+  #
+  # ─── PROFILE CONTROL ───────────────────────────────────────────────
+  # --noprofile          : Ignore ALL default profiles, start from scratch
+  #                        Use when built-in profile is too restrictive
+  # --ignore=OPTION      : Disable specific option from the loaded profile
+  #                        e.g. --ignore=private-tmp overrides "private-tmp" in profile
+  #
+  # ─── FILESYSTEM ISOLATION ──────────────────────────────────────────
+  # --whitelist=PATH     : Allow read/write access ONLY to this path
+  #                        Everything else in $HOME is hidden/empty
+  #                        Creates the dir if it doesn't exist
+  # --private-tmp        : Mount empty tmpfs on /tmp (isolates temp files)
+  #                        Breaks apps that need shared /tmp (X11, some IPC)
+  # --private-dev        : Mount minimal /dev (null, zero, urandom only)
+  #                        Blocks GPU (/dev/dri), audio, webcam, USB
+  # --noexec=PATH        : Mount PATH with noexec flag (can't run binaries there)
+  #                        Profile "noexec" usually applies to /tmp, /home
+  #
+  # ─── NETWORK ISOLATION ─────────────────────────────────────────────
+  # --net=none           : Complete network isolation, no connectivity
+  #                        Good for media players, editors, offline tools
+  # --net=INTERFACE      : Use only specified network interface
+  # --netfilter          : Enable default network filter (blocks most)
+  #
+  # ─── D-BUS FILTERING ───────────────────────────────────────────────
+  # D-Bus = Inter-process communication for Linux desktop
+  #
+  # --dbus-user=none     : Block ALL user session D-Bus (breaks most GUI apps)
+  # --dbus-user=filter   : Allow only explicitly permitted D-Bus services
+  # --dbus-user.talk=SVC : Allow app to CALL methods on service SVC
+  # --dbus-user.own=SVC  : Allow app to REGISTER as service SVC
+  # --dbus-system=filter : Same but for system bus (hardware, power, etc)
+  #
+  # Common D-Bus services:
+  #   org.freedesktop.Notifications  : Desktop notifications (notify-send)
+  #   org.freedesktop.portal.*       : XDG portals (file picker, screen share)
+  #   org.freedesktop.portal.Desktop : General desktop integration
+  #   org.freedesktop.portal.FileChooser : Native file open/save dialogs
+  #   org.freedesktop.ScreenSaver    : Inhibit screensaver during video
+  #   org.freedesktop.UPower         : Battery status, power events
+  #   org.freedesktop.secrets        : Keyring/password storage access
+  #   org.gnome.keyring              : GNOME keyring for passwords
+  #   org.gnome.SessionManager       : Session state (idle, inhibit)
+  #   org.kde.StatusNotifierWatcher  : System tray icons (KDE/Electron apps)
+  #
+  # ─── CAPABILITY DROPPING ───────────────────────────────────────────
+  # Linux capabilities = fine-grained root privileges
+  #
+  # --caps.drop=all      : Drop ALL capabilities (recommended baseline)
+  #                        App runs as unprivileged user, can't:
+  #                        - Bind to ports <1024
+  #                        - Change file ownership
+  #                        - Load kernel modules
+  #                        - Use raw sockets
+  #                        - Mount filesystems
+  # --caps.keep=CAP      : Keep specific capability after dropping all
+  #                        e.g. --caps.keep=net_raw for ping
+  #
+  # ─── PRIVILEGE RESTRICTION ─────────────────────────────────────────
+  # --nonewprivs         : Prevent gaining new privileges via setuid/setgid
+  #                        Blocks exploits that try to escalate via suid binaries
+  #                        Should ALWAYS be enabled
+  # --noroot             : Disable root user inside sandbox (even if you're root)
+  #                        Maps root UID to nobody, prevents root exploits
+  #
+  # ─── SYSCALL FILTERING ─────────────────────────────────────────────
+  # --seccomp            : Enable seccomp-bpf syscall filter
+  #                        Blocks dangerous syscalls (ptrace, mount, etc)
+  #                        Can break apps that need unusual syscalls
+  #                        (JIT compilers, VMs, GPU drivers sometimes)
+  # --seccomp.drop=LIST  : Block specific syscalls
+  # --seccomp.keep=LIST  : Only allow specific syscalls (very restrictive)
+  #
+  # ─── ENVIRONMENT VARIABLES ─────────────────────────────────────────
+  # --env=VAR=VALUE      : Set environment variable inside sandbox
+  #
+  # Common env vars:
+  #   GTK_THEME=Adwaita-dark     : Force dark GTK theme
+  #   MOZ_ENABLE_WAYLAND=1       : Firefox native Wayland (no XWayland)
+  #   MOZ_DRM_DEVICE=/dev/dri/X  : GPU device for Firefox DRM/WebGL
+  #   MOZ_DISABLE_RDD_SANDBOX=1  : Disable Firefox RDD sandbox (fixes VA-API)
+  #   LIBVA_DRIVER_NAME=iHD      : Intel VA-API driver (hardware video decode)
+  #   ELECTRON_OZONE_PLATFORM_HINT=auto : Electron apps auto-detect Wayland
+  #
+  # ═══════════════════════════════════════════════════════════════════
+  #
   programs.firejail = {
     enable = true;
     wrappedBinaries = {
 
+      # ─────────────────────────────────────────────────────────────
+      # BROWSERS - Network-exposed, persistent profiles, DRM+HW accel
+      # ─────────────────────────────────────────────────────────────
 
-      # ─────────────────────────────────────────────────────────────
-      # BROWSERS - High risk, network-exposed, handles untrusted content
-      # ─────────────────────────────────────────────────────────────
       firefox = {
         executable = "${pkgs.firefox}/bin/firefox";
         profile = "${pkgs.firejail}/etc/firejail/firefox.profile";
         desktop = "${pkgs.firefox}/share/applications/firefox.desktop";
+        extraArgs = [
+          # Override built-in profile restrictions that break functionality
+          "--ignore=private-tmp"    # Firefox needs shared /tmp for IPC
+          "--ignore=private-dev"    # Need /dev/dri for GPU acceleration + DRM
+          "--ignore=noexec"         # Firefox JIT needs executable memory regions
+
+          # Environment: theme and Wayland/GPU settings
+          "--env=GTK_THEME=Adwaita-dark"       # Force dark theme
+          "--env=MOZ_ENABLE_WAYLAND=1"         # Native Wayland (no XWayland)
+          "--env=MOZ_DRM_DEVICE=/dev/dri/renderD128"  # GPU for DRM content
+          "--env=LIBVA_DRIVER_NAME=iHD"        # Intel VA-API driver for HW decode
+
+          # D-Bus: filter mode = only allow what we specify
+          "--dbus-user=filter"
+          "--dbus-user.talk=org.freedesktop.Notifications"  # Desktop notifications
+          "--dbus-user.talk=org.freedesktop.portal.*"       # All XDG portals (file picker, screen share, etc)
+          "--dbus-user.talk=org.freedesktop.ScreenSaver"    # Inhibit screensaver during video
+          "--dbus-user.talk=org.gnome.SessionManager"       # Session integration
+          "--dbus-system=filter"
+          "--dbus-system.talk=org.freedesktop.UPower"       # Battery/power status
+
+          # Filesystem: whitelist = ONLY these paths visible from $HOME
+          "--whitelist=~/.mozilla"        # Firefox profile (bookmarks, passwords, extensions)
+          "--whitelist=~/.cache/mozilla"  # Cache (speeds up browsing)
+          "--whitelist=~/Downloads"       # Download location
+          "--whitelist=~/Pictures"        # For uploading images
+
+          # Security hardening (baseline for all apps)
+          "--caps.drop=all"   # Drop all Linux capabilities
+          "--nonewprivs"      # Can't gain privileges via setuid
+          "--noroot"          # No root inside sandbox
+        ];
+      };
+
+      chromium = {
+        executable = "${pkgs.chromium}/bin/chromium";
+        profile = "${pkgs.firejail}/etc/firejail/chromium.profile";
+        desktop = "${pkgs.chromium}/share/applications/chromium-browser.desktop";
+        extraArgs = [
+          # Override restrictive profile settings
+          "--ignore=private-tmp"    # Chromium IPC needs /tmp
+          "--ignore=private-dev"    # GPU access for WebGL, video decode, Widevine
+          "--ignore=noexec"         # V8 JIT compiler needs exec
+
+          # Environment
+          "--env=GTK_THEME=Adwaita-dark"
+          "--env=LIBVA_DRIVER_NAME=iHD"  # Intel hardware video decode
+
+          # D-Bus access
+          "--dbus-user=filter"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.*"
+          "--dbus-user.talk=org.freedesktop.ScreenSaver"
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"  # System tray icon
+          "--dbus-system=filter"
+          "--dbus-system.talk=org.freedesktop.UPower"
+
+          # Filesystem whitelists
+          "--whitelist=~/.config/chromium"   # Profile (bookmarks, extensions, settings)
+          "--whitelist=~/.cache/chromium"    # Cache
+          "--whitelist=~/.pki"               # SSL certificates database
+          "--whitelist=~/Downloads"
+          "--whitelist=~/Pictures"
+
+          # Security
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+        ];
+      };
+
+      brave = {
+        executable = "${pkgs.brave}/bin/brave";
+        profile = "${pkgs.firejail}/etc/firejail/brave.profile";
+        desktop = "${pkgs.brave}/share/applications/brave-browser.desktop";
+        extraArgs = [
+          # Override restrictive profile settings (same as Chromium)
+          "--ignore=private-tmp"
+          "--ignore=private-dev"
+          "--ignore=noexec"
+
+          # Environment
+          "--env=GTK_THEME=Adwaita-dark"
+          "--env=LIBVA_DRIVER_NAME=iHD"
+
+          # D-Bus access
+          "--dbus-user=filter"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.*"
+          "--dbus-user.talk=org.freedesktop.ScreenSaver"
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
+          "--dbus-system=filter"
+          "--dbus-system.talk=org.freedesktop.UPower"
+
+          # Filesystem whitelists (Brave uses BraveSoftware dir)
+          "--whitelist=~/.config/BraveSoftware"
+          "--whitelist=~/.cache/BraveSoftware"
+          "--whitelist=~/.pki"
+          "--whitelist=~/Downloads"
+          "--whitelist=~/Pictures"
+
+          # Security
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+        ];
       };
 
       # ─────────────────────────────────────────────────────────────
@@ -1144,14 +1395,17 @@ in
         desktop = "${pkgs.thunderbird}/share/applications/thunderbird.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--env=MOZ_ENABLE_WAYLAND=1"
-          "--dbus-user.talk=org.freedesktop.Notifications"
-          "--dbus-user.talk=org.freedesktop.portal.Desktop"
-          "--whitelist=~/Downloads"
-          "--caps.drop=all"
-          "--nonewprivs"
-          "--noroot"
-          "--seccomp"
+          "--env=MOZ_ENABLE_WAYLAND=1"         # Native Wayland support
+
+          "--dbus-user.talk=org.freedesktop.Notifications"  # New mail notifications
+          "--dbus-user.talk=org.freedesktop.portal.Desktop" # Desktop integration
+
+          "--whitelist=~/Downloads"  # Save attachments
+
+          "--caps.drop=all"   # No special privileges
+          "--nonewprivs"      # No privilege escalation
+          "--noroot"          # No root in sandbox
+          "--seccomp"         # Block dangerous syscalls (TB doesn't need GPU)
         ];
       };
 
@@ -1164,9 +1418,11 @@ in
         desktop = "${signal-desktop-desktopitem}/share/applications/signal-desktop.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"
-          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
-          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--env=ELECTRON_OZONE_PLATFORM_HINT=auto"  # Auto-detect Wayland for Electron
+
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"  # System tray icon
+          "--dbus-user.talk=org.freedesktop.Notifications"  # Message notifications
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
@@ -1178,26 +1434,27 @@ in
         profile = "${pkgs.firejail}/etc/firejail/fractal.profile";
         desktop = "${pkgs.fractal}/share/applications/org.gnome.Fractal.desktop";
         extraArgs = [
-          # Environment
           "--env=GTK_THEME=Adwaita-dark"
-          # D-Bus (notifications, portals, secrets for E2EE keys)
-          "--dbus-user.talk=org.freedesktop.Notifications"
-          "--dbus-user.talk=org.freedesktop.portal.Desktop"
-          "--dbus-user.talk=org.freedesktop.portal.FileChooser"
-          "--dbus-user.talk=org.freedesktop.secrets"
-          "--dbus-user.talk=org.gnome.keyring"
-          # Filesystem (E2EE keys stored in config)
-          "--whitelist=~/.config/fractal"
-          "--whitelist=~/.local/share/fractal"
-          "--whitelist=~/.cache/fractal"
-          "--whitelist=~/Downloads"
-          "--whitelist=~/Pictures"
-          # Security hardening
+
+          # D-Bus for Matrix client functionality
+          "--dbus-user.talk=org.freedesktop.Notifications"     # Message alerts
+          "--dbus-user.talk=org.freedesktop.portal.Desktop"    # Desktop integration
+          "--dbus-user.talk=org.freedesktop.portal.FileChooser" # Send files
+          "--dbus-user.talk=org.freedesktop.secrets"           # Access keyring for E2EE keys
+          "--dbus-user.talk=org.gnome.keyring"                 # GNOME keyring
+
+          # Fractal data directories (E2EE keys are critical!)
+          "--whitelist=~/.config/fractal"       # Config + encryption keys
+          "--whitelist=~/.local/share/fractal"  # Local data
+          "--whitelist=~/.cache/fractal"        # Media cache
+          "--whitelist=~/Downloads"             # Save files
+          "--whitelist=~/Pictures"              # Send images
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--seccomp"
-          "--private-tmp"
+          "--seccomp"       # Syscall filter (GTK app, no JIT needed)
+          "--private-tmp"   # Isolated /tmp (no shared X11 needed)
         ];
       };
 
@@ -1210,14 +1467,17 @@ in
         desktop = "${pkgs.libreoffice}/share/applications/startcenter.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--dbus-user.talk=org.freedesktop.Notifications"
-          "--whitelist=~/Documents"
-          "--whitelist=~/Downloads"
+
+          "--dbus-user.talk=org.freedesktop.Notifications"  # Save complete, etc
+
+          "--whitelist=~/Documents"   # Primary document location
+          "--whitelist=~/Downloads"   # Downloaded docs
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--seccomp"
-          "--private-tmp"
+          "--seccomp"       # Block dangerous syscalls
+          "--private-tmp"   # Isolated temp files (defense against macro exploits)
         ];
       };
 
@@ -1230,15 +1490,17 @@ in
         desktop = "${pkgs.vlc}/share/applications/vlc.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Videos"
-          "--whitelist=~/Music"
-          "--whitelist=~/Downloads"
-          "--whitelist=/media"
+
+          "--whitelist=~/Videos"      # Video files
+          "--whitelist=~/Music"       # Audio files
+          "--whitelist=~/Downloads"   # Downloaded media
+          "--whitelist=/media"        # External drives
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--seccomp"
-          "--net=none"
+          "--seccomp"       # Syscall filter
+          "--net=none"      # NO NETWORK - VLC doesn't need internet for local files
         ];
       };
 
@@ -1248,13 +1510,15 @@ in
         desktop = "${pkgs.handbrake}/share/applications/fr.handbrake.ghb.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Videos"
-          "--whitelist=~/Downloads"
-          "--whitelist=/media"
+
+          "--whitelist=~/Videos"      # Source and output videos
+          "--whitelist=~/Downloads"   # Downloaded videos to convert
+          "--whitelist=/media"        # External drives
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
+          "--net=none"      # Offline transcoding, no network needed
         ];
       };
 
@@ -1264,12 +1528,14 @@ in
         desktop = "${pkgs.audacity}/share/applications/audacity.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Music"
-          "--whitelist=~/Downloads"
+
+          "--whitelist=~/Music"       # Audio project files
+          "--whitelist=~/Downloads"   # Downloaded audio
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
+          "--net=none"      # Audio editing is offline
         ];
       };
 
@@ -1282,12 +1548,14 @@ in
         desktop = "${pkgs.gimp}/share/applications/gimp.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Pictures"
-          "--whitelist=~/Downloads"
+
+          "--whitelist=~/Pictures"    # Image files
+          "--whitelist=~/Downloads"   # Downloaded images
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
+          "--net=none"      # Image editing is offline
         ];
       };
 
@@ -1295,11 +1563,12 @@ in
         executable = "${pkgs.imv}/bin/imv";
         profile = "${pkgs.firejail}/etc/firejail/imv.profile";
         extraArgs = [
+          # Minimal image viewer - maximum restrictions
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
-          "--seccomp"
+          "--net=none"      # Viewing images needs no network
+          "--seccomp"       # Block dangerous syscalls
         ];
       };
 
@@ -1310,12 +1579,13 @@ in
         executable = "${pkgs.zathura}/bin/zathura";
         profile = "${pkgs.firejail}/etc/firejail/zathura.profile";
         extraArgs = [
+          # PDF viewer - very restrictive (PDFs can contain exploits)
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
-          "--seccomp"
-          "--private-tmp"
+          "--net=none"      # PDFs should never need network
+          "--seccomp"       # Block dangerous syscalls
+          "--private-tmp"   # Isolate temp files
         ];
       };
 
@@ -1325,13 +1595,15 @@ in
         desktop = "${pkgs.calibre}/share/applications/calibre-gui.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Documents"
-          "--whitelist=~/Downloads"
-          "--whitelist=~/Calibre Library"
+
+          "--whitelist=~/Documents"       # Document storage
+          "--whitelist=~/Downloads"       # Downloaded ebooks
+          "--whitelist=~/Calibre Library" # Calibre's default library location
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
+          "--net=none"      # Ebook management is offline
         ];
       };
 
@@ -1344,16 +1616,19 @@ in
         desktop = "${pkgs.orca-slicer}/share/applications/OrcaSlicer.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--noprofile"
+
+          "--noprofile"     # Ignore default profile entirely (no good orca profile exists)
+
+          "--whitelist=~/Downloads"              # Downloaded STL files
+          "--whitelist=~/3DPrinting"             # 3D printing project folder
+          "--whitelist=~/.config/OrcaSlicer"     # App config
+          "--whitelist=~/.local/share/OrcaSlicer" # App data
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
-          "--net=none"
-          "--whitelist=~/Downloads"
-          "--whitelist=~/3DPrinting"
-          "--whitelist=~/.config/OrcaSlicer"
-          "--whitelist=~/.local/share/OrcaSlicer"
-          "--seccomp"
+          "--net=none"      # Slicing is offline (no cloud printing)
+          "--seccomp"       # Syscall filter
         ];
       };
 
@@ -1366,10 +1641,14 @@ in
         desktop = "${pkgs.qbittorrent-enhanced}/share/applications/org.qbittorrent.qBittorrent.desktop";
         extraArgs = [
           "--env=GTK_THEME=Adwaita-dark"
-          "--whitelist=~/Downloads"
+
+          "--whitelist=~/Downloads"  # Torrent download location
+
           "--caps.drop=all"
           "--nonewprivs"
           "--noroot"
+          # NOTE: No --net=none here - torrents need network!
+          # NOTE: No --seccomp - qbittorrent needs some syscalls for DHT/networking
         ];
       };
     };
@@ -1383,8 +1662,8 @@ in
     # Port 24800: Barrier/Deskflow KVM sharing (keyboard/mouse across machines)
     # WARNING: KVM traffic is unencrypted. Only use on trusted LANs.
     # For remote use, tunnel through SSH: ssh -L 24800:localhost:24800 host
-    allowedTCPPorts = [ 24800 ];
-    allowedUDPPorts = [ 24800 ];
+    allowedTCPPorts = [  ];
+    allowedUDPPorts = [  ];
   };
 
   #####################################################################

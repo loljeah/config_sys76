@@ -25,5 +25,8 @@ fi
 # SSH agent is managed by NixOS (programs.ssh.startAgent)
 # Keys are auto-added on first use via AddKeysToAgent
 
+# Idle timeout - auto logout after 15 minutes of inactivity
+TMOUT=900
+
 # Prompt (simple, functional)
 PS1='\[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '

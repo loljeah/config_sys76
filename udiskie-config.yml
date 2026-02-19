@@ -16,36 +16,30 @@ device_config:
       - users
 
 # Specific options for common filesystems
-# NTFS
+# NTFS - uses current user's UID/GID automatically via udisks2
   - id_type: ntfs
     options:
       - rw
       - noatime
-      - uid=1000
-      - gid=100
-      - dmask=022
-      - fmask=133
+      - dmask=077
+      - fmask=177
       - windows_names
 
-# exFAT
+# exFAT - uses current user's UID/GID automatically via udisks2
   - id_type: exfat
     options:
       - rw
       - noatime
-      - uid=1000
-      - gid=100
-      - dmask=022
-      - fmask=133
+      - dmask=077
+      - fmask=177
 
-# FAT32/VFAT
+# FAT32/VFAT - uses current user's UID/GID automatically via udisks2
   - id_type: vfat
     options:
       - rw
       - noatime
-      - uid=1000
-      - gid=100
-      - dmask=022
-      - fmask=133
+      - dmask=077
+      - fmask=177
       - shortname=mixed
 
 # ext4 (Linux)
