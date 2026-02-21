@@ -16,6 +16,72 @@ let
     startupWMClass = "Signal";
   };
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Boneless - Maximum hardened Chromium
+  # No WebRTC, No MDM, No Remote Debug, No Telemetry
+  # https://github.com/user/boneless_ungoogled
+  # ─────────────────────────────────────────────────────────────────────────
+  boneless = pkgs.ungoogled-chromium.override {
+    commandLineArgs = [
+      # WebRTC completely disabled
+      "--disable-webrtc"
+      "--webrtc-ip-handling-policy=disable_non_proxied_udp"
+      "--enforce-webrtc-ip-permission-check"
+      "--disable-features=WebRTC,WebRTCPipeWireCapturer"
+      # Remote debugging blocked
+      "--disable-remote-debugging"
+      "--remote-debugging-port=-1"
+      # Sync/translate/background networking disabled
+      "--disable-sync"
+      "--disable-translate"
+      "--disable-background-networking"
+      "--disable-default-apps"
+      "--disable-client-side-phishing-detection"
+      "--no-pings"
+      # Field trials (A/B testing) disabled
+      "--disable-field-trial-config"
+      "--disable-features=OptimizationHints,MediaRouter,Translate,TranslateUI"
+      # Autofill server communication disabled
+      "--disable-features=AutofillServerCommunication"
+      # Privacy Sandbox completely disabled
+      "--disable-features=PrivacySandboxSettings4,InterestFeedV2"
+      "--disable-features=FlocId,Topics,Fledge,AttributionReporting"
+      "--disable-features=BrowsingTopics,AdMeasurement,ConversionMeasurement"
+      # Fingerprinting protection
+      "--fingerprinting-canvas-image-data-noise"
+      "--fingerprinting-canvas-measuretext-noise"
+      "--fingerprinting-client-rects-noise"
+      # Extra hardening
+      "--disable-breakpad"
+      "--disable-component-extensions-with-background-pages"
+      "--disable-features=UsernameFirstFlow"
+      # Password store - use basic (no keyring)
+      "--password-store=basic"
+      # Performance
+      "--enable-gpu-rasterization"
+      "--enable-zero-copy"
+    ];
+  };
+
+  boneless-desktop = pkgs.makeDesktopItem {
+    name = "boneless";
+    desktopName = "Boneless";
+    genericName = "Hardened Web Browser";
+    exec = "boneless %U";
+    icon = "chromium";
+    type = "Application";
+    categories = [ "Network" "WebBrowser" ];
+    mimeTypes = [
+      "text/html"
+      "text/xml"
+      "application/xhtml+xml"
+      "x-scheme-handler/http"
+      "x-scheme-handler/https"
+    ];
+    startupWMClass = "Chromium-browser";
+    comment = "Maximum hardened browser - No WebRTC/MDM/Remote Debug";
+  };
+
 in
 {
   imports =
@@ -146,7 +212,7 @@ in
     LIBVA_DRIVER_NAME = "iHD";
     # Let apps auto-detect Wayland
     NIXOS_OZONE_WL = "1";
-    DEFAULT_BROWSER = "chromium";
+    DEFAULT_BROWSER = "boneless";
     # NVIDIA Wayland support
     GBM_BACKEND = "nvidia-drm";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
@@ -994,12 +1060,13 @@ in
       "application/x-compressed-tar" = "org.gnome.FileRoller.desktop";
       "application/x-7z-compressed" = "org.gnome.FileRoller.desktop";
       "application/x-rar" = "org.gnome.FileRoller.desktop";
-      "text/html" = "chromium-browser.desktop";
-      "x-scheme-handler/http" = "chromium-browser.desktop";
-      "x-scheme-handler/https" = "chromium-browser.desktop";
-      "x-scheme-handler/about" = "chromium-browser.desktop";
-      "x-scheme-handler/unknown" = "chromium-browser.desktop";
-      "application/xhtml+xml" = "chromium-browser.desktop";
+      # Boneless as default browser (hardened chromium)
+      "text/html" = "boneless.desktop";
+      "x-scheme-handler/http" = "boneless.desktop";
+      "x-scheme-handler/https" = "boneless.desktop";
+      "x-scheme-handler/about" = "boneless.desktop";
+      "x-scheme-handler/unknown" = "boneless.desktop";
+      "application/xhtml+xml" = "boneless.desktop";
     };
   };
 
@@ -1312,6 +1379,45 @@ in
         ];
       };
 
+      # Boneless - Maximum hardened browser (no WebRTC/MDM/remote debug)
+      boneless = {
+        executable = "${boneless}/bin/chromium";
+        profile = "${pkgs.firejail}/etc/firejail/chromium.profile";
+        desktop = "${boneless-desktop}/share/applications/boneless.desktop";
+        extraArgs = [
+          # Override restrictive profile settings
+          "--ignore=private-tmp"    # Chromium IPC needs /tmp
+          "--ignore=private-dev"    # GPU access for WebGL, video decode
+          "--ignore=noexec"         # V8 JIT compiler needs exec
+
+          # Environment
+          "--env=GTK_THEME=Adwaita-dark"
+          "--env=LIBVA_DRIVER_NAME=iHD"  # Intel hardware video decode
+
+          # D-Bus access
+          "--dbus-user=filter"
+          "--dbus-user.talk=org.freedesktop.Notifications"
+          "--dbus-user.talk=org.freedesktop.portal.*"
+          "--dbus-user.talk=org.freedesktop.ScreenSaver"
+          "--dbus-user.talk=org.kde.StatusNotifierWatcher"
+          "--dbus-system=filter"
+          "--dbus-system.talk=org.freedesktop.UPower"
+
+          # Filesystem whitelists
+          "--whitelist=~/.config/chromium"   # Profile (bookmarks, extensions, settings)
+          "--whitelist=~/.cache/chromium"    # Cache
+          "--whitelist=~/.pki"               # SSL certificates database
+          "--whitelist=~/Downloads"
+          "--whitelist=~/Pictures"
+
+          # Security
+          "--caps.drop=all"
+          "--nonewprivs"
+          "--noroot"
+        ];
+      };
+
+      # Regular Chromium as fallback (e.g., for WebRTC video calls, Widevine DRM)
       chromium = {
         executable = "${pkgs.chromium}/bin/chromium";
         profile = "${pkgs.firejail}/etc/firejail/chromium.profile";
