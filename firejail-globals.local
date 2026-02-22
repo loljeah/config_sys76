@@ -1,5 +1,6 @@
 # Firejail globals.local - applies to all sandboxed applications
 # Deploy to: ~/.config/firejail/globals.local
+# SECURITY: These blacklists protect credentials from ALL sandboxed apps
 
 # Note: Per-app whitelists are preferred over globals for better isolation.
 # These globals provide minimal shared access; add app-specific overrides
@@ -9,8 +10,45 @@
 whitelist ~/.local/share/fonts
 whitelist ~/.fonts
 
-# Deny common sensitive locations explicitly
+# ─── CREDENTIAL PROTECTION ────────────────────────────────────────
+# SSH keys and config
 blacklist ~/.ssh
+blacklist ~/.ssh/*
+
+# GPG keys and config
 blacklist ~/.gnupg
+blacklist ~/.gnupg/*
+
+# Git credentials
 blacklist ~/.config/git/credentials
+blacklist ~/.gitconfig
+blacklist ~/.git-credentials
+
+# Network credentials
 blacklist ~/.netrc
+blacklist ~/.curlrc
+blacklist ~/.wgetrc
+
+# Cloud provider credentials
+blacklist ~/.aws
+blacklist ~/.azure
+blacklist ~/.config/gcloud
+
+# Password managers (additional layer - KeePassXC already sandboxed)
+blacklist ~/.local/share/keepassxc
+
+# NixOS secrets (if any)
+blacklist ~/.config/nix/netrc
+
+# ─── HISTORY PROTECTION ───────────────────────────────────────────
+# Prevent sandboxed apps from reading shell history
+blacklist ~/.bash_history
+blacklist ~/.zsh_history
+blacklist ~/.local/share/fish/fish_history
+
+# ─── BROWSER PROFILE ISOLATION ────────────────────────────────────
+# Prevent cross-browser profile access (each browser has its own whitelist)
+blacklist ~/.mozilla
+blacklist ~/.config/chromium
+blacklist ~/.config/BraveSoftware
+blacklist ~/.config/google-chrome

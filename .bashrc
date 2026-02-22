@@ -4,9 +4,10 @@
 [[ $- != *i* ]] && return
 
 # History settings
-HISTCONTROL=ignoreboth
-HISTSIZE=10000
-HISTFILESIZE=20000
+# SECURITY: Reduced size, ignorespace hides sensitive commands starting with space
+HISTCONTROL=ignoreboth:erasedups
+HISTSIZE=2000
+HISTFILESIZE=4000
 shopt -s histappend
 
 # Check window size after each command

@@ -60,6 +60,9 @@ deploy  gtk-4.0-settings.ini  ~/.config/gtk-4.0/settings.ini
 # XDG portal config (fixes oversized file dialogs)
 deploy  sway-portals.conf     ~/.config/xdg-desktop-portal/sway-portals.conf
 
+# Firejail global rules (SSH/GPG protection for ALL sandboxed apps)
+deploy  firejail-globals.local ~/.config/firejail/globals.local
+
 # ──────────────────────────────────────────────────────────────────
 #  Executable scripts
 # ──────────────────────────────────────────────────────────────────

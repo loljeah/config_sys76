@@ -36,9 +36,9 @@ in
   };
 
   # System76 Open Firmware / Coreboot support
-  # ec_sys.write_support needed for system76-driver
+  # NOTE: ec_sys.write_support=1 removed for security (EC write = firmware attack vector)
+  # System76 power-daemon works without it; only needed for direct EC register writes
   boot.kernelParams = [
-    "ec_sys.write_support=1"
 
     # Intel i9-14900HX optimizations
     "intel_pstate=active"             # Use Intel P-State driver for best performance
@@ -60,7 +60,9 @@ in
     "transparent_hugepage=madvise"    # THP on-demand (better for mixed workloads)
 
     # Power saving
-    "nmi_watchdog=0"                  # Disable NMI watchdog (saves power, loses crash debug)
+    # SECURITY TRADE-OFF: NMI watchdog disabled for battery life
+    # Re-enable (remove this line) if you need kernel crash debugging
+    "nmi_watchdog=0"
 
     # Hibernate resume from swapfile
     "resume_offset=11255808"
@@ -163,6 +165,25 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # ─── SECURE BOOT (Optional) ─────────────────────────────────────
+  # NixOS supports Secure Boot via Lanzaboote (community project, v0.4.2+)
+  # Prerequisites: UEFI mode, systemd-boot, flakes enabled
+  #
+  # To enable:
+  # 1. Add lanzaboote flake input and import the module
+  # 2. Generate signing keys: sudo sbctl create-keys
+  # 3. Set boot.loader.systemd-boot.enable = false (lanzaboote replaces it)
+  # 4. Enable: boot.lanzaboote.enable = true
+  # 5. Enroll keys in BIOS or via: sudo sbctl enroll-keys --microsoft
+  #
+  # Docs: https://github.com/nix-community/lanzaboote
+  # Wiki: https://wiki.nixos.org/wiki/Lanzaboote
+  #
+  # NOTE: Secure Boot protects boot chain only. For full protection:
+  # - Set UEFI firmware password
+  # - Enable full disk encryption (LUKS)
+  # - Consider TPM-backed decryption for convenience
+
   # Resume from hibernate (swapfile)
   boot.resumeDevice = "/dev/disk/by-uuid/f72c91bc-5dcd-4463-ac9d-a545bdeac61e";
 
@@ -247,6 +268,7 @@ in
 
   networking.hostName = "ax76";
   networking.networkmanager.enable = true;
+
 
   # OpenConnect VPN support (Cisco AnyConnect compatible)
   networking.networkmanager.plugins = with pkgs; [
@@ -410,9 +432,14 @@ in
   '';
 
   # Swapfile for hibernation (adjust size to match your RAM)
+  # SECURITY: For maximum security, use a LUKS-encrypted swap partition instead
+  # This swapfile approach stores RAM contents unencrypted on disk during hibernate
+  # If hibernate is not needed, consider: randomEncryption.enable = true (breaks hibernate)
   swapDevices = [{
     device = "/var/lib/swapfile";
     size = 32 * 1024;  # 32GB in MB - adjust to your RAM size
+    # To enable random encryption (breaks hibernate but encrypts swap):
+    # randomEncryption.enable = true;
   }];
 
   # ACPID for lid events (keyboard LED script removed)
@@ -421,6 +448,47 @@ in
   # Security
   security.polkit.enable = true;
   security.rtkit.enable = true;
+
+  # Kernel & Network security hardening (sysctl)
+  boot.kernel.sysctl = {
+    # ─── KERNEL HARDENING ─────────────────────────────────────────
+    # Restrict dmesg to root (info disclosure)
+    "kernel.dmesg_restrict" = 1;
+    # Hide kernel pointers from unprivileged users
+    "kernel.kptr_restrict" = 2;
+    # Restrict ptrace to direct children only (anti-debugging exploits)
+    "kernel.yama.ptrace_scope" = 2;
+    # Disable unprivileged BPF (CVE mitigation)
+    "kernel.unprivileged_bpf_disabled" = 1;
+    # Harden BPF JIT compiler
+    "net.core.bpf_jit_harden" = 2;
+    # Restrict perf_event (side-channel mitigation)
+    "kernel.perf_event_paranoid" = 3;
+    # Disable Magic SysRq except sync+reboot (176 = sync+reboot only)
+    "kernel.sysrq" = 176;
+    # Restrict kernel log levels
+    "kernel.printk" = "3 3 3 3";
+
+    # ─── NETWORK HARDENING ────────────────────────────────────────
+    # Ignore ICMP redirects (MITM prevention)
+    "net.ipv4.conf.all.accept_redirects" = 0;
+    "net.ipv6.conf.all.accept_redirects" = 0;
+    "net.ipv4.conf.default.accept_redirects" = 0;
+    "net.ipv6.conf.default.accept_redirects" = 0;
+    # Don't send ICMP redirects
+    "net.ipv4.conf.all.send_redirects" = 0;
+    "net.ipv4.conf.default.send_redirects" = 0;
+    # Ignore source-routed packets
+    "net.ipv4.conf.all.accept_source_route" = 0;
+    "net.ipv6.conf.all.accept_source_route" = 0;
+    # Enable TCP SYN cookies (SYN flood protection)
+    "net.ipv4.tcp_syncookies" = 1;
+    # Log martian packets (spoofed source addresses)
+    "net.ipv4.conf.all.log_martians" = 1;
+    # Reverse path filtering (anti-spoofing)
+    "net.ipv4.conf.all.rp_filter" = 1;
+    "net.ipv4.conf.default.rp_filter" = 1;
+  };
 
   # Passwordless sudo for System76 power management
   security.sudo.extraRules = [
@@ -439,8 +507,9 @@ in
   security.pam.services.swaylock = {};
   security.pam.services.hyprlock = {};
 
-  # GNOME Keyring disabled - not using VS Code Remote-SSH anymore
-  services.gnome.gnome-keyring.enable = false;
+  # GNOME Keyring - required for Fractal E2EE keys (org.freedesktop.secrets)
+  # Alternative: use KeePassXC's Secret Service integration
+  services.gnome.gnome-keyring.enable = true;
 
   # iOS device support
   services.usbmuxd = {
@@ -464,7 +533,11 @@ in
   };
 
   # USBGuard - USB device authorization policy
-  # See commands below to generate initial rules before enabling
+  # IMPORTANT: Generate initial rules BEFORE enabling, or USB will be blocked!
+  # Run: sudo usbguard generate-policy > /tmp/rules.conf
+  # Review: cat /tmp/rules.conf
+  # Apply: sudo cp /tmp/rules.conf /var/lib/usbguard/rules.conf
+  # Then nixos-rebuild switch
   services.usbguard = {
     enable = true;
     presentDevicePolicy = "apply-policy";  # Apply policy to already-connected devices
@@ -575,15 +648,15 @@ in
   };
 
   # Polkit rules for passwordless mounting of REMOVABLE media only
-  # System mounts require password for security
+  # System mounts and LUKS unlock require password for security
   security.polkit.extraConfig = ''
     polkit.addRule(function(action, subject) {
       /* Only allow passwordless mount/unmount for removable media (USB, SD cards) */
+      /* SECURITY: encrypted-unlock removed - LUKS should always require password */
       if ((action.id == "org.freedesktop.udisks2.filesystem-mount" ||
            action.id == "org.freedesktop.udisks2.filesystem-unmount-others" ||
            action.id == "org.freedesktop.udisks2.eject-media" ||
            action.id == "org.freedesktop.udisks2.power-off-drive" ||
-           action.id == "org.freedesktop.udisks2.encrypted-unlock" ||
            action.id == "org.freedesktop.udisks2.loop-setup") &&
           subject.isInGroup("wheel") &&
           subject.local &&
@@ -622,7 +695,8 @@ in
     SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", RUN+="${pkgs.system76-power}/bin/system76-power profile balanced"
 
     # System76 keyboard backlight - allow video group to control
-    SUBSYSTEM=="leds", KERNEL=="system76_acpi::kbd_backlight", RUN+="${pkgs.coreutils}/bin/chmod 666 /sys/class/leds/system76_acpi::kbd_backlight/brightness /sys/class/leds/system76_acpi::kbd_backlight/color"
+    # SECURITY: MODE 0664 (not 0666) - only owner/group can write, world can read
+    SUBSYSTEM=="leds", KERNEL=="system76_acpi::kbd_backlight", GROUP="video", MODE="0664"
 
     # NVIDIA GPU runtime power management - allow video group
     SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", RUN+="${pkgs.coreutils}/bin/chmod 664 /sys%p/power/control", GROUP="video"

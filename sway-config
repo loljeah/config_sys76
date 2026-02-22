@@ -107,11 +107,12 @@ exec nm-applet --indicator
 # Mount with RW permissions, use ntfs-3g for NTFS
 exec udiskie --automount --notify --tray --file-manager thunar
 
-# Clipboard history daemon (auto-clear after 100 entries to limit exposure)
+# Clipboard history daemon (auto-clear to limit sensitive data exposure)
 exec wl-paste --type text --watch cliphist store
 exec wl-paste --type image --watch cliphist store
-# Periodic clipboard cleanup (clear entries older than 1 hour)
-exec_always bash -c 'while sleep 3600; do cliphist wipe; done &'
+# SECURITY: Wipe clipboard every 5 minutes (passwords, secrets)
+# Use KeePassXC auto-clear for shorter retention of password entries
+exec_always bash -c 'while sleep 300; do cliphist wipe; done &'
 
 # Polkit agent (for GUI privilege escalation)
 exec /run/current-system/sw/libexec/polkit-gnome-authentication-agent-1
@@ -294,7 +295,9 @@ for_window [app_id="^gamescope$"] move container to workspace 5, fullscreen enab
 #######################
 # Floating rules
 #######################
-for_window [app_id="foot"] opacity 0.85
+# SECURITY: Terminal opacity 1.0 (no transparency) to prevent shoulder surfing
+# Uncomment for aesthetics if security is less critical: opacity 0.85
+for_window [app_id="foot"] opacity 1.0
 
 for_window [app_id="pwvucontrol"] floating enable
 for_window [app_id="nm-connection-editor"] floating enable
