@@ -87,7 +87,6 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ./undervolt.nix
     ];
 
   #####################################################################
@@ -219,6 +218,9 @@ in
     GBM_BACKEND = "nvidia-drm";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
     WLR_NO_HARDWARE_CURSORS = "1";  # Fix cursor issues on NVIDIA
+    # Cursor theme (green with purple outline)
+    XCURSOR_THEME = "cyber-cursor";
+    XCURSOR_SIZE = "32";
     # Clear conflicting preloads
     LD_PRELOAD = "";
   };
@@ -576,6 +578,8 @@ in
   # GNOME Keyring - required for Fractal E2EE keys (org.freedesktop.secrets)
   # Alternative: use KeePassXC's Secret Service integration
   services.gnome.gnome-keyring.enable = true;
+  # Disable GNOME's SSH agent - we use programs.ssh.startAgent instead
+  services.gnome.gcr-ssh-agent.enable = false;
 
   # iOS device support
   services.usbmuxd = {
@@ -943,6 +947,7 @@ in
       foot
       wl-clipboard
       cliphist
+      kanshi            # Display profile manager for Wayland
       swaylock
       swayidle
       brightnessctl
@@ -1007,6 +1012,9 @@ in
       export GBM_BACKEND=nvidia-drm
       export __GLX_VENDOR_LIBRARY_NAME=nvidia
       export WLR_NO_HARDWARE_CURSORS=1
+      # Cursor theme (run generate-cyber-cursor.sh first)
+      export XCURSOR_THEME=cyber-cursor
+      export XCURSOR_SIZE=32
     '';
   };
 
@@ -1201,6 +1209,15 @@ in
     extraOpts = {
       # Hardware acceleration
       "HardwareAccelerationModeEnabled" = true;
+
+      # Allow extension installation (fixes "managed by organization" blocking extensions)
+      # "*" = default policy for all extensions not explicitly configured
+      "ExtensionSettings" = {
+        "*" = {
+          "installation_mode" = "allowed";
+          "allowed_types" = ["extension" "theme" "user_script"];
+        };
+      };
     };
     defaultSearchProviderEnabled = false;
   };
@@ -1258,6 +1275,13 @@ in
 
     # Notifications
     libnotify
+
+    # Cursor theme tools
+    xcur2png          # Extract PNGs from X cursor files
+    xorg.xcursorgen   # Generate X cursor themes from PNGs
+    imagemagick       # Image manipulation (for recoloring cursors)
+    librsvg           # SVG to PNG with proper alpha transparency
+    glib              # gsettings for cursor/GTK theme configuration
 
     # NVIDIA tools
     nvtopPackages.full      # GPU monitoring
@@ -1424,12 +1448,18 @@ in
           "--ignore=private-tmp"    # Firefox needs shared /tmp for IPC
           "--ignore=private-dev"    # Need /dev/dri for GPU acceleration + DRM
           "--ignore=noexec"         # Firefox JIT needs executable memory regions
+          "--ignore=nogroups"       # NVIDIA drivers require supplementary groups
+
+          # Override globals.local blacklists (processed before whitelists)
+          "--noblacklist=~/.mozilla"
+          "--noblacklist=~/.cache/mozilla"
 
           # Environment: theme and Wayland/GPU settings
           "--env=GTK_THEME=Adwaita-dark"       # Force dark theme
           "--env=MOZ_ENABLE_WAYLAND=1"         # Native Wayland (no XWayland)
           "--env=MOZ_DRM_DEVICE=/dev/dri/renderD128"  # GPU for DRM content
           "--env=LIBVA_DRIVER_NAME=iHD"        # Intel VA-API driver for HW decode
+          "--env=DOWNLOADS=~/Downloads"        # Set DOWNLOADS for profile
 
           # D-Bus: filter mode = only allow what we specify
           "--dbus-user=filter"
@@ -1463,10 +1493,16 @@ in
           "--ignore=private-tmp"    # Chromium IPC needs /tmp
           "--ignore=private-dev"    # GPU access for WebGL, video decode
           "--ignore=noexec"         # V8 JIT compiler needs exec
+          "--ignore=nogroups"       # NVIDIA drivers require supplementary groups
+
+          # Override globals.local blacklists (processed before whitelists)
+          "--noblacklist=~/.config/chromium"
+          "--noblacklist=~/.cache/chromium"
 
           # Environment
           "--env=GTK_THEME=Adwaita-dark"
           "--env=LIBVA_DRIVER_NAME=iHD"  # Intel hardware video decode
+          "--env=DOWNLOADS=~/Downloads"   # Set DOWNLOADS for profile
 
           # D-Bus access
           "--dbus-user=filter"
@@ -1501,10 +1537,16 @@ in
           "--ignore=private-tmp"    # Chromium IPC needs /tmp
           "--ignore=private-dev"    # GPU access for WebGL, video decode, Widevine
           "--ignore=noexec"         # V8 JIT compiler needs exec
+          "--ignore=nogroups"       # NVIDIA drivers require supplementary groups
+
+          # Override globals.local blacklists (processed before whitelists)
+          "--noblacklist=~/.config/chromium"
+          "--noblacklist=~/.cache/chromium"
 
           # Environment
           "--env=GTK_THEME=Adwaita-dark"
           "--env=LIBVA_DRIVER_NAME=iHD"  # Intel hardware video decode
+          "--env=DOWNLOADS=~/Downloads"   # Set DOWNLOADS for profile
 
           # D-Bus access
           "--dbus-user=filter"
@@ -1538,10 +1580,16 @@ in
           "--ignore=private-tmp"
           "--ignore=private-dev"
           "--ignore=noexec"
+          "--ignore=nogroups"       # NVIDIA drivers require supplementary groups
+
+          # Override globals.local blacklists (processed before whitelists)
+          "--noblacklist=~/.config/BraveSoftware"
+          "--noblacklist=~/.cache/BraveSoftware"
 
           # Environment
           "--env=GTK_THEME=Adwaita-dark"
           "--env=LIBVA_DRIVER_NAME=iHD"
+          "--env=DOWNLOADS=~/Downloads"   # Set DOWNLOADS for profile
 
           # D-Bus access
           "--dbus-user=filter"

@@ -60,6 +60,9 @@ deploy  gtk-4.0-settings.ini  ~/.config/gtk-4.0/settings.ini
 # XDG portal config (fixes oversized file dialogs)
 deploy  sway-portals.conf     ~/.config/xdg-desktop-portal/sway-portals.conf
 
+# Kanshi display profile manager
+deploy  kanshi-config         ~/.config/kanshi/config
+
 # Firejail global rules (SSH/GPG protection for ALL sandboxed apps)
 deploy  firejail-globals.local ~/.config/firejail/globals.local
 
@@ -73,6 +76,9 @@ chmod +x ~/.local/bin/netinfo 2>/dev/null && ok "chmod +x  ~/.local/bin/netinfo"
 
 deploy  waybar-todo          ~/.local/bin/waybar-todo
 chmod +x ~/.local/bin/waybar-todo 2>/dev/null && ok "chmod +x  ~/.local/bin/waybar-todo"
+
+deploy  yubikey-idle-check.sh ~/.local/bin/yubikey-idle-check.sh
+chmod +x ~/.local/bin/yubikey-idle-check.sh 2>/dev/null && ok "chmod +x  ~/.local/bin/yubikey-idle-check.sh"
 
 # ──────────────────────────────────────────────────────────────────
 #  Standard directories
@@ -109,6 +115,26 @@ if [[ -f configuration.nix ]]; then
 fi
 
 # ──────────────────────────────────────────────────────────────────
+#  Cursor theme (green with purple outline)
+# ──────────────────────────────────────────────────────────────────
+printf "\n── Cursor theme ───────────────────────────────────────────\n"
+
+if [[ -x generate-cyber-cursor.sh ]]; then
+    if command -v xcursorgen >/dev/null 2>&1 && command -v magick >/dev/null 2>&1; then
+        if ./generate-cyber-cursor.sh; then
+            ok "cyber-cursor theme generated"
+        else
+            warn "cursor theme generation failed (run manually after nixos-rebuild)"
+        fi
+    else
+        warn "xcursorgen or magick (imagemagick) not found — run after: sudo nixos-rebuild switch"
+        warn "then run: ./generate-cyber-cursor.sh"
+    fi
+else
+    warn "generate-cyber-cursor.sh not found"
+fi
+
+# ──────────────────────────────────────────────────────────────────
 #  Reload compositor + display profiles
 # ──────────────────────────────────────────────────────────────────
 printf "\n── Reloading ──────────────────────────────────────────────\n"
@@ -117,6 +143,12 @@ if swaymsg reload 2>/dev/null; then
     ok "swaymsg reload"
 else
     warn "swaymsg reload failed (sway not running?)"
+fi
+
+if pkill -HUP kanshi 2>/dev/null; then
+    ok "kanshi reloaded"
+else
+    warn "kanshi not running (will start on next sway session)"
 fi
 
 # ──────────────────────────────────────────────────────────────────

@@ -5,10 +5,11 @@
 # Variables
 #######################
 set $mod Mod4
-set $left h
-set $down j
-set $up k
-set $right l
+# i3 default navigation: jkl; (NOT vim hjkl)
+set $left j
+set $down k
+set $up l
+set $right semicolon
 set $term foot
 set $menu rofi -show drun -show-icons
 set $file_manager thunar
@@ -60,6 +61,22 @@ input type:pointer {
 }
 
 #######################
+# Cursor
+#######################
+# Cursor size (32px = 8px bigger than default 24)
+# Custom theme: cyber-cursor (green with purple outline)
+#
+# To generate the cursor theme, run:
+#   ~/gitZ/config_sys76/generate-cyber-cursor.sh
+# Or deploy.sh will run it automatically.
+#
+# Fallback: If cyber-cursor not found, uses Adwaita at 32px
+seat * xcursor_theme cyber-cursor 32
+
+# Fallback if custom theme not installed
+exec_always test -d ~/.local/share/icons/cyber-cursor || seat * xcursor_theme Adwaita 32
+
+#######################
 # Appearance
 #######################
 # Gaps
@@ -88,17 +105,23 @@ exec_always {
 #######################
 # Idle & Lock
 #######################
+# YubiKey connected = inhibit idle (screen won't lock or turn off)
+# When YubiKey is removed, normal idle behavior resumes
+# Manual lock: Super+Escape still works regardless of YubiKey
 exec swayidle -w \
-    timeout 300 'hyprlock' \
-    timeout 600 'swaymsg "output * power off"' \
+    timeout 300 '~/.local/bin/yubikey-idle-check.sh hyprlock' \
+    timeout 600 '~/.local/bin/yubikey-idle-check.sh swaymsg "output * power off"' \
         resume 'swaymsg "output * power on"' \
-    before-sleep 'hyprlock'
+    before-sleep '~/.local/bin/yubikey-idle-check.sh hyprlock'
 
 #######################
 # Autostart
 #######################
 # Notification daemon
 exec mako
+
+# Display profile manager (auto-applies based on connected monitors)
+exec kanshi
 
 # Network manager applet
 exec nm-applet --indicator
@@ -129,8 +152,8 @@ bindsym $mod+Return exec $term
 # Start launcher
 bindsym $mod+d exec $menu
 
-# Start file manager
-bindsym $mod+e exec $file_manager
+# Start file manager (Shift+e since $mod+e is i3 default toggle split)
+bindsym $mod+Shift+Return exec $file_manager
 
 # Kill focused window
 bindsym $mod+Shift+q kill
@@ -234,19 +257,25 @@ bindsym $mod+Shift+9 move container to workspace number 9
 bindsym $mod+Shift+0 move container to workspace number 10
 
 #######################
-# Keybindings - Layout
+# Keybindings - Layout (i3 defaults)
 #######################
-bindsym $mod+b splith
+# Split orientation
+bindsym $mod+h splith
 bindsym $mod+v splitv
 
+# Layout modes
 bindsym $mod+s layout stacking
 bindsym $mod+w layout tabbed
-bindsym $mod+t layout toggle split
+bindsym $mod+e layout toggle split
 
+# Fullscreen and floating
 bindsym $mod+f fullscreen
 bindsym $mod+Shift+space floating toggle
 bindsym $mod+space focus mode_toggle
+
+# Focus parent/child
 bindsym $mod+a focus parent
+bindsym $mod+Shift+a focus child
 
 #######################
 # Keybindings - Scratchpad

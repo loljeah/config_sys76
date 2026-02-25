@@ -1,0 +1,35 @@
+# Kanshi display profile configuration
+# Place this file at: ~/.config/kanshi/config
+#
+# Kanshi auto-applies display profiles based on connected outputs.
+# Run 'pkill -HUP kanshi' or 'swaymsg reload' after changes.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile: Laptop only (System76 Serval WS - BOE 4K display)
+# ─────────────────────────────────────────────────────────────────────────────
+profile laptop {
+    output eDP-1 enable mode 3840x2160@144Hz position 0,0 scale 1.5 transform normal
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile templates for external monitors (uncomment and customize)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Laptop + external monitor to the right
+# profile laptop-external {
+#     output eDP-1 enable mode 3840x2160@144Hz position 0,0 scale 1.5
+#     output HDMI-A-1 enable mode 1920x1080@60Hz position 2560,0 scale 1
+# }
+
+# Laptop + external monitor (laptop lid closed / disabled)
+# profile docked {
+#     output eDP-1 disable
+#     output HDMI-A-1 enable mode 2560x1440@60Hz position 0,0 scale 1
+# }
+
+# Triple monitor setup (from your sway-config workspace assignments)
+# profile triple {
+#     output DP-2 enable mode 2560x1440@99.90Hz position 0,0 transform 90
+#     output HDMI-A-1 enable mode 1920x1080@239.76Hz position 1440,740
+#     output DP-3 enable mode 1280x1024@60Hz position 3360,640 transform 90
+# }
