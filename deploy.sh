@@ -74,8 +74,8 @@ printf "\n── Executables ─────────────────
 deploy  netinfo               ~/.local/bin/netinfo
 chmod +x ~/.local/bin/netinfo 2>/dev/null && ok "chmod +x  ~/.local/bin/netinfo"
 
-deploy  waybar-todo          ~/.local/bin/waybar-todo
-chmod +x ~/.local/bin/waybar-todo 2>/dev/null && ok "chmod +x  ~/.local/bin/waybar-todo"
+deploy  waybar-notes          ~/.local/bin/waybar-notes
+chmod +x ~/.local/bin/waybar-notes 2>/dev/null && ok "chmod +x  ~/.local/bin/waybar-notes"
 
 deploy  yubikey-idle-check.sh ~/.local/bin/yubikey-idle-check.sh
 chmod +x ~/.local/bin/yubikey-idle-check.sh 2>/dev/null && ok "chmod +x  ~/.local/bin/yubikey-idle-check.sh"
@@ -85,7 +85,7 @@ chmod +x ~/.local/bin/yubikey-idle-check.sh 2>/dev/null && ok "chmod +x  ~/.loca
 # ──────────────────────────────────────────────────────────────────
 mkdir -p ~/Pictures/Screenshots
 mkdir -p ~/3DPrinting
-mkdir -p ~/.local/share/waybar-todo
+# Notes files are in ~ (notes.md, todos.md)
 mkdir -p ~/Documents
 mkdir -p ~/Videos
 mkdir -p ~/Music

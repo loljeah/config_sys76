@@ -234,19 +234,20 @@ button:hover {
     background-color: #6b2d6b;
 }
 
-#custom-todo {
+#custom-notes {
     background-color: #3d1a3d;
     padding: 0 8px;
     margin: 0 1px;
     color: #00ffff;
 }
 
-#custom-todo.has-tasks {
+#custom-notes.has-todos {
     background-color: #bd00ff;
     color: #ffffff;
+    font-weight: bold;
 }
 
-#custom-todo.empty {
+#custom-notes.empty {
     background-color: #2d1f3d;
     color: #808080;
 }

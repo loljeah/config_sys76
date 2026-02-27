@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Waybar custom module for notes/todos
+# Shows important items from ~/notes.md and ~/todos.md on hover
+
+NOTES_FILE="$HOME/notes.md"
+TODOS_FILE="$HOME/todos.md"
+
+# Create files if they don't exist
+[ ! -f "$NOTES_FILE" ] && echo "# Notes" > "$NOTES_FILE"
+[ ! -f "$TODOS_FILE" ] && echo "# Todos" > "$TODOS_FILE"
+
+# Count important items (lines starting with - [ ])
+count_todos() {
+    local count=0
+    if [ -f "$TODOS_FILE" ]; then
+        count=$(grep -cE '^\s*-\s*\[\s*\]' "$TODOS_FILE" 2>/dev/null) || count=0
+    fi
+    echo "$count"
+}
+
+# Get tooltip content (notes + todos preview)
+get_tooltip() {
+    local tooltip=""
+
+    # Add todos (unchecked items)
+    if [ -f "$TODOS_FILE" ]; then
+        local todos
+        todos=$(grep -E '^\s*-\s*\[\s*\]' "$TODOS_FILE" | head -10 | sed 's/^\s*-\s*\[\s*\]/TODO:/')
+        if [ -n "$todos" ]; then
+            tooltip+="$todos"
+        fi
+    fi
+
+    # Add separator if we have both
+    if [ -n "$tooltip" ] && [ -f "$NOTES_FILE" ]; then
+        local notes_content
+        notes_content=$(grep -v '^#' "$NOTES_FILE" | grep -v '^$' | head -5)
+        if [ -n "$notes_content" ]; then
+            tooltip+="\n---\n"
+        fi
+    fi
+
+    # Add notes (first non-empty, non-header lines)
+    if [ -f "$NOTES_FILE" ]; then
+        local notes
+        notes=$(grep -v '^#' "$NOTES_FILE" | grep -v '^$' | head -5 | sed 's/^/NOTE: /')
+        if [ -n "$notes" ]; then
+            tooltip+="$notes"
+        fi
+    fi
+
+    # Escape for JSON
+    tooltip=$(echo -e "$tooltip" | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+    echo "$tooltip"
+}
+
+# Output JSON for waybar
+todo_count=$(count_todos)
+tooltip=$(get_tooltip)
+
+if [ "$todo_count" -gt 0 ]; then
+    class="has-todos"
+    text="NOTES ($todo_count)"
+else
+    class="empty"
+    text="NOTES"
+fi
+
+# Check if files have content
+has_content=false
+[ -s "$NOTES_FILE" ] && has_content=true
+[ -s "$TODOS_FILE" ] && has_content=true
+
+if [ "$has_content" = true ] && [ -n "$tooltip" ]; then
+    echo "{\"text\": \"$text\", \"tooltip\": \"$tooltip\", \"class\": \"$class\"}"
+else
+    echo "{\"text\": \"$text\", \"tooltip\": \"Hover: view notes/todos\\nClick: edit todos\\nMiddle-click: edit notes\", \"class\": \"$class\"}"
+fi

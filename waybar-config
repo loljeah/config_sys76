@@ -5,7 +5,7 @@
     "spacing": 2,
     "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "wlr/taskbar"],
     "modules-center": ["sway/window"],
-    "modules-right": ["mpris", "tray", "idle_inhibitor", "pulseaudio", "network", "cpu", "memory", "disk", "temperature", "battery", "custom/todo", "clock"],
+    "modules-right": ["custom/notes", "mpris", "tray", "idle_inhibitor", "pulseaudio", "network", "cpu", "memory", "disk", "temperature", "battery", "clock"],
 
     "sway/workspaces": {
         "disable-scroll": false,
@@ -160,15 +160,13 @@
         "on-click": "playerctl play-pause"
     },
 
-    "custom/todo": {
-        "format": "TODO {}",
+    "custom/notes": {
+        "exec": "~/.local/bin/waybar-notes",
+        "return-type": "json",
         "interval": 10,
-        "exec": "~/.local/bin/waybar-todo count",
-        "on-click": "~/.local/bin/waybar-todo menu",
-        "on-click-right": "~/.local/bin/waybar-todo add",
-        "on-click-middle": "~/.local/bin/waybar-todo edit",
         "tooltip": true,
-        "exec-on-event": true,
-        "return-type": "json"
+        "on-click": "foot -e nvim ~/todos.md",
+        "on-click-middle": "foot -e nvim ~/notes.md",
+        "on-click-right": "foot -e nvim ~/notes.md ~/todos.md"
     }
 }
